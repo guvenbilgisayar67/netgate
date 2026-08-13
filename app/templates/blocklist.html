@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NetGate - Site Engelleme</title>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
+    body { background:#eef2f6; color:#243447; }
+    .topbar { background:#1e3a5f; color:#fff; padding:0 24px; height:60px; display:flex; align-items:center; justify-content:space-between; }
+    .topbar .brand { font-size:19px; font-weight:700; }
+    .topbar a { color:#cfe0f0; text-decoration:none; font-size:14px; }
+    .topbar a:hover { color:#fff; }
+    .layout { display:flex; min-height:calc(100vh - 60px); }
+    .side { width:220px; background:#fff; border-right:1px solid #e2e8ef; padding:18px 0; }
+    .side a { display:block; padding:12px 24px; color:#4a5b6e; text-decoration:none; font-size:14px; border-left:3px solid transparent; }
+    .side a:hover { background:#f4f7fa; border-left-color:#2b6cb0; color:#1e3a5f; }
+    .side a.active { background:#eef5fc; border-left-color:#2b6cb0; color:#1e3a5f; font-weight:600; }
+    .main { flex:1; padding:28px; }
+    .h1 { font-size:22px; margin-bottom:4px; }
+    .muted { color:#8a97a8; font-size:14px; margin-bottom:24px; }
+    .panel { background:#fff; border-radius:12px; padding:22px; box-shadow:0 2px 8px rgba(0,0,0,.04); margin-bottom:22px; }
+    .addform { display:flex; gap:10px; flex-wrap:wrap; }
+    .addform input[type=text] { flex:1; min-width:180px; padding:11px; border:1px solid #d5dde6; border-radius:8px; font-size:14px; }
+    .addform button { padding:11px 22px; background:#2b6cb0; color:#fff; border:none; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer; }
+    .addform button:hover { background:#245a94; }
+    table { width:100%; border-collapse:collapse; }
+    th { text-align:left; font-size:12px; text-transform:uppercase; letter-spacing:.5px; color:#8a97a8; padding:10px 12px; border-bottom:2px solid #eef2f6; }
+    td { padding:12px; border-bottom:1px solid #f0f3f7; font-size:14px; }
+    .dom { font-weight:600; color:#1e3a5f; }
+    .del { background:#fde8e8; color:#c0392b; border:none; padding:7px 14px; border-radius:6px; font-size:13px; cursor:pointer; }
+    .del:hover { background:#f9d0d0; }
+    .empty { text-align:center; color:#8a97a8; padding:30px; font-size:14px; }
+    .msg { padding:11px 16px; border-radius:8px; font-size:14px; margin-bottom:18px; }
+    .msg.ok { background:#e6f6ec; color:#1e7e45; }
+    .msg.warn { background:#fef3e0; color:#b26a00; }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand">NetGate</div>
+    <div><span style="margin-right:16px;font-size:14px;">{{ user }}</span><a href="/logout">Cikis</a></div>
+  </div>
+  <div class="layout">
+    <nav class="side">
+      <a href="/">Genel Bakis</a>
+      <a href="#">Cihazlar</a>
+      <a href="/blocklist" class="active">Site Engelleme</a>
+      <a href="#">Loglar</a>
+      <a href="#">Kullanicilar</a>
+      <a href="#">Ayarlar</a>
+    </nav>
+    <div class="main">
+      <div class="h1">Site Engelleme</div>
+      <div class="muted">Engellenecek alan adlarini buradan yonetin</div>
+
+      {% if msg == "eklendi" %}<div class="msg ok">Site engellendi.</div>{% endif %}
+      {% if msg == "zaten_var" %}<div class="msg warn">Bu site zaten listede.</div>{% endif %}
+      {% if msg == "silindi" %}<div class="msg ok">Site listeden kaldirildi.</div>{% endif %}
+      {% if msg == "bos" %}<div class="msg warn">Alan adi bos olamaz.</div>{% endif %}
+
+      <div class="panel">
+        <form class="addform" method="post" action="/blocklist/add">
+          <input type="text" name="domain" placeholder="ornek: youtube.com" autofocus required>
+          <input type="text" name="note" placeholder="Not (istege bagli)">
+          <button type="submit">Engelle</button>
+        </form>
+      </div>
+
+      <div class="panel">
+        {% if domains %}
+        <table>
+          <thead>
+            <tr><th>Alan Adi</th><th>Not</th><th>Eklenme</th><th></th></tr>
+          </thead>
+          <tbody>
+            {% for d in domains %}
+            <tr>
+              <td class="dom">{{ d.domain }}</td>
+              <td>{{ d.note or "-" }}</td>
+              <td>{{ d.created }}</td>
+              <td style="text-align:right;">
+                <form method="post" action="/blocklist/delete" style="display:inline;">
+                  <input type="hidden" name="domain_id" value="{{ d.id }}">
+                  <button class="del" type="submit">Sil</button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <div class="empty">Henuz engellenen site yok. Yukaridan ekleyebilirsiniz.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</body>
+</html>

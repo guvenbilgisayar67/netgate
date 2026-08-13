@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NetGate - Giris</title>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
+    body { min-height:100vh; display:flex; align-items:center; justify-content:center; background:linear-gradient(135deg,#1e3a5f,#0f1c2e); }
+    .box { background:#fff; padding:40px; border-radius:14px; box-shadow:0 20px 60px rgba(0,0,0,.4); width:340px; }
+    .logo { text-align:center; margin-bottom:8px; font-size:26px; font-weight:700; color:#1e3a5f; }
+    .sub { text-align:center; color:#8a97a8; font-size:13px; margin-bottom:26px; }
+    label { display:block; font-size:13px; color:#5a6b7f; margin:14px 0 6px; }
+    input { width:100%; padding:12px; border:1px solid #d5dde6; border-radius:8px; font-size:14px; }
+    input:focus { outline:none; border-color:#2b6cb0; }
+    button { width:100%; margin-top:22px; padding:12px; background:#2b6cb0; color:#fff; border:none; border-radius:8px; font-size:15px; font-weight:600; cursor:pointer; }
+    button:hover { background:#245a94; }
+    .err { background:#fde8e8; color:#c0392b; padding:10px; border-radius:8px; font-size:13px; margin-bottom:16px; text-align:center; }
+  </style>
+</head>
+<body>
+  <div class="box">
+    <div class="logo">NetGate</div>
+    <div class="sub">Ag Yonetim Paneli</div>
+    {% if error %}<div class="err">{{ error }}</div>{% endif %}
+    <form method="post" action="/login">
+      <label>Kullanici Adi</label>
+      <input type="text" name="username" autofocus required>
+      <label>Sifre</label>
+      <input type="password" name="password" required>
+      <button type="submit">Giris Yap</button>
+    </form>
+  </div>
+</body>
+</html>
+
