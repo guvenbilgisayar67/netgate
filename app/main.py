@@ -4,7 +4,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 import secrets, pathlib
-from app import db, logs, devices, users, settings
+from app import db, logs, devices, users, settings, categories
 import json
 
 BASE = pathlib.Path(__file__).parent
@@ -15,6 +15,7 @@ templates = Jinja2Templates(directory=BASE / "templates")
 
 db.init_db()
 users.init_users()
+categories.init_categories()
 
 def is_logged_in(request: Request) -> bool:
     return request.session.get("user") is not None
@@ -210,3 +211,25 @@ async def settings_import(request: Request):
         except Exception:
             return RedirectResponse("/settings?msg=import_hata", status_code=status.HTTP_303_SEE_OTHER)
     return RedirectResponse("/settings?msg=import_hata", status_code=status.HTTP_303_SEE_OTHER)
+# ---------- Kategoriler ----------
+
+@app.get("/categories", response_class=HTMLResponse)
+def categories_page(request: Request):
+    if not is_logged_in(request):
+        return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
+    return templates.TemplateResponse(request, "categories.html", {
+        "user": request.session["user"],
+        "categories": categories.get_states(),
+        "msg": request.query_params.get("msg"),
+    })
+
+@app.post("/categories/toggle")
+def categories_toggle(request: Request, key: str = Form(...), action: str = Form(...)):
+    if not is_logged_in(request):
+        return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
+    if action == "enable":
+        ok, msg = categories.enable_category(key)
+    else:
+        ok, msg = categories.disable_category(key)
+    return RedirectResponse("/categories?msg=" + ("ok" if ok else "hata"),
+                            status_code=status.HTTP_303_SEE_OTHER)
