@@ -259,10 +259,11 @@ def portal_toggle(request: Request):
 
 @app.post("/portal/user/add")
 def portal_user_add(request: Request, username: str = Form(...), password: str = Form(...),
-                    full_name: str = Form(""), group_name: str = Form("ogrenci"), duration_min: int = Form(60)):
+                    full_name: str = Form(""), group_name: str = Form("ogrenci"),
+                    duration_min: int = Form(60), bandwidth_kbps: int = Form(0)):
     if not is_logged_in(request):
         return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
-    portal.add_portal_user(username, password, full_name, group_name, duration_min)
+    portal.add_portal_user(username, password, full_name, group_name, duration_min, bandwidth_kbps)
     return RedirectResponse("/portal?msg=user_add", status_code=status.HTTP_303_SEE_OTHER)
 @app.post("/portal/user/delete")
 def portal_user_delete(request: Request, uid: int = Form(...)):
@@ -303,7 +304,12 @@ async def portal_group_update(request: Request):
     for key in ("ads", "adult", "social", "games"):
         if form.get(f"c_{key}"):
             cats.append(key)
-    portal.update_group(name, ",".join(cats))
+    bw = form.get("bandwidth_kbps", "0")
+    try:
+        bw = int(bw)
+    except ValueError:
+        bw = 0
+    portal.update_group(name, ",".join(cats), bw)
     return RedirectResponse("/portal?msg=group_upd", status_code=status.HTTP_303_SEE_OTHER)
 @app.get("/hotspot", response_class=HTMLResponse)
 def hotspot_page(request: Request):
