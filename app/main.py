@@ -4,7 +4,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 import secrets, pathlib
-from app import db, logs, devices
+from app import db, logs, devices, users
 
 BASE = pathlib.Path(__file__).parent
 app = FastAPI(title="NetGate")
@@ -12,13 +12,13 @@ app.add_middleware(SessionMiddleware, secret_key=secrets.token_hex(32))
 app.mount("/static", StaticFiles(directory=BASE / "static"), name="static")
 templates = Jinja2Templates(directory=BASE / "templates")
 
-ADMIN_USER = "admin"
-ADMIN_PASS = "admin"
-
 db.init_db()
+users.init_users()
 
 def is_logged_in(request: Request) -> bool:
     return request.session.get("user") is not None
+
+# ---------- Giris ----------
 
 @app.get("/login", response_class=HTMLResponse)
 def login_page(request: Request):
@@ -26,8 +26,13 @@ def login_page(request: Request):
 
 @app.post("/login")
 def login_submit(request: Request, username: str = Form(...), password: str = Form(...)):
-    if username == ADMIN_USER and password == ADMIN_PASS:
-        request.session["user"] = username
+    user = users.verify_user(username, password)
+    if user:
+        request.session["user"] = user["username"]
+        # Sifre degistirmesi gerekiyorsa oraya yonlendir
+        if user["must_change"]:
+            request.session["must_change"] = True
+            return RedirectResponse("/change-password", status_code=status.HTTP_303_SEE_OTHER)
         return RedirectResponse("/", status_code=status.HTTP_303_SEE_OTHER)
     return templates.TemplateResponse(request, "login.html", {"error": "Kullanici adi veya sifre hatali"})
 
@@ -35,6 +40,38 @@ def login_submit(request: Request, username: str = Form(...), password: str = Fo
 def logout(request: Request):
     request.session.clear()
     return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
+
+# ---------- Sifre Degistirme ----------
+
+@app.get("/change-password", response_class=HTMLResponse)
+def change_pw_page(request: Request):
+    if not is_logged_in(request):
+        return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
+    return templates.TemplateResponse(request, "change_password.html", {
+        "user": request.session["user"],
+        "forced": request.session.get("must_change", False),
+        "msg": None,
+    })
+
+@app.post("/change-password")
+def change_pw_submit(request: Request, new_password: str = Form(...), new_password2: str = Form(...)):
+    if not is_logged_in(request):
+        return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
+    if new_password != new_password2:
+        return templates.TemplateResponse(request, "change_password.html", {
+            "user": request.session["user"], "forced": request.session.get("must_change", False),
+            "msg": ("err", "Sifreler eslesmiyor"),
+        })
+    ok, msg = users.change_password(request.session["user"], new_password)
+    if ok:
+        request.session.pop("must_change", None)
+        return RedirectResponse("/", status_code=status.HTTP_303_SEE_OTHER)
+    return templates.TemplateResponse(request, "change_password.html", {
+        "user": request.session["user"], "forced": request.session.get("must_change", False),
+        "msg": ("err", msg),
+    })
+
+# ---------- Dashboard ----------
 
 @app.get("/", response_class=HTMLResponse)
 def dashboard(request: Request):
@@ -76,6 +113,7 @@ def blocklist_delete(request: Request, domain_id: int = Form(...)):
         return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
     db.delete_domain(domain_id)
     return RedirectResponse("/blocklist?msg=silindi", status_code=status.HTTP_303_SEE_OTHER)
+
 # ---------- Loglar ----------
 
 @app.get("/logs", response_class=HTMLResponse)
@@ -93,6 +131,7 @@ def logs_page(request: Request):
         "only_blocked": only_blocked,
         "search": search,
     })
+
 # ---------- Cihazlar ----------
 
 @app.get("/devices", response_class=HTMLResponse)
@@ -104,3 +143,29 @@ def devices_page(request: Request):
         "user": request.session["user"],
         "devices": cihazlar,
     })
+
+# ---------- Kullanicilar ----------
+
+@app.get("/users", response_class=HTMLResponse)
+def users_page(request: Request):
+    if not is_logged_in(request):
+        return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
+    return templates.TemplateResponse(request, "users.html", {
+        "user": request.session["user"],
+        "users": users.list_users(),
+        "msg": request.query_params.get("msg"),
+    })
+
+@app.post("/users/add")
+def users_add(request: Request, username: str = Form(...), password: str = Form(...)):
+    if not is_logged_in(request):
+        return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
+    ok, msg = users.add_user(username, password)
+    return RedirectResponse(f"/users?msg={'eklendi' if ok else 'hata'}", status_code=status.HTTP_303_SEE_OTHER)
+
+@app.post("/users/delete")
+def users_delete(request: Request, user_id: int = Form(...)):
+    if not is_logged_in(request):
+        return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
+    ok, msg = users.delete_user(user_id)
+    return RedirectResponse(f"/users?msg={'silindi' if ok else 'hata'}", status_code=status.HTTP_303_SEE_OTHER)
