@@ -4,7 +4,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 import secrets, pathlib
-from app import db
+from app import db, logs, devices
 
 BASE = pathlib.Path(__file__).parent
 app = FastAPI(title="NetGate")
@@ -44,6 +44,7 @@ def dashboard(request: Request):
     return templates.TemplateResponse(request, "dashboard.html", {
         "user": request.session["user"],
         "blocked_count": len(domains),
+        "device_count": devices.device_count(),
     })
 
 # ---------- Site Engelleme ----------
@@ -75,3 +76,31 @@ def blocklist_delete(request: Request, domain_id: int = Form(...)):
         return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
     db.delete_domain(domain_id)
     return RedirectResponse("/blocklist?msg=silindi", status_code=status.HTTP_303_SEE_OTHER)
+# ---------- Loglar ----------
+
+@app.get("/logs", response_class=HTMLResponse)
+def logs_page(request: Request):
+    if not is_logged_in(request):
+        return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
+    only_blocked = request.query_params.get("filter") == "blocked"
+    search = request.query_params.get("q", "")
+    kayitlar = logs.read_dns_logs(limit=200, only_blocked=only_blocked, search=search)
+    stats = logs.log_stats()
+    return templates.TemplateResponse(request, "logs.html", {
+        "user": request.session["user"],
+        "logs": kayitlar,
+        "stats": stats,
+        "only_blocked": only_blocked,
+        "search": search,
+    })
+# ---------- Cihazlar ----------
+
+@app.get("/devices", response_class=HTMLResponse)
+def devices_page(request: Request):
+    if not is_logged_in(request):
+        return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
+    cihazlar = devices.list_devices()
+    return templates.TemplateResponse(request, "devices.html", {
+        "user": request.session["user"],
+        "devices": cihazlar,
+    })

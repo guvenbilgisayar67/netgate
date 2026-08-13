@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NetGate - Loglar</title>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
+    body { background:#eef2f6; color:#243447; }
+    .topbar { background:#1e3a5f; color:#fff; padding:0 24px; height:60px; display:flex; align-items:center; justify-content:space-between; }
+    .topbar .brand { font-size:19px; font-weight:700; }
+    .topbar a { color:#cfe0f0; text-decoration:none; font-size:14px; }
+    .topbar a:hover { color:#fff; }
+    .layout { display:flex; min-height:calc(100vh - 60px); }
+    .side { width:220px; background:#fff; border-right:1px solid #e2e8ef; padding:18px 0; }
+    .side a { display:block; padding:12px 24px; color:#4a5b6e; text-decoration:none; font-size:14px; border-left:3px solid transparent; }
+    .side a:hover { background:#f4f7fa; border-left-color:#2b6cb0; color:#1e3a5f; }
+    .side a.active { background:#eef5fc; border-left-color:#2b6cb0; color:#1e3a5f; font-weight:600; }
+    .main { flex:1; padding:28px; }
+    .h1 { font-size:22px; margin-bottom:4px; }
+    .muted { color:#8a97a8; font-size:14px; margin-bottom:24px; }
+    .stats { display:flex; gap:16px; margin-bottom:22px; flex-wrap:wrap; }
+    .stat { background:#fff; border-radius:12px; padding:16px 22px; box-shadow:0 2px 8px rgba(0,0,0,.04); min-width:140px; }
+    .stat .k { font-size:12px; color:#8a97a8; text-transform:uppercase; letter-spacing:.5px; }
+    .stat .v { font-size:26px; font-weight:700; margin-top:4px; color:#1e3a5f; }
+    .stat.red .v { color:#c0392b; }
+    .stat.green .v { color:#1e7e45; }
+    .toolbar { display:flex; gap:10px; margin-bottom:16px; flex-wrap:wrap; align-items:center; }
+    .toolbar input { padding:10px 14px; border:1px solid #d5dde6; border-radius:8px; font-size:14px; min-width:220px; }
+    .toolbar a { padding:9px 16px; border-radius:8px; font-size:13px; text-decoration:none; border:1px solid #d5dde6; color:#4a5b6e; }
+    .toolbar a.active { background:#2b6cb0; color:#fff; border-color:#2b6cb0; }
+    .toolbar button { padding:10px 18px; background:#2b6cb0; color:#fff; border:none; border-radius:8px; font-size:14px; cursor:pointer; }
+    .panel { background:#fff; border-radius:12px; padding:6px 0; box-shadow:0 2px 8px rgba(0,0,0,.04); }
+    table { width:100%; border-collapse:collapse; }
+    th { text-align:left; font-size:12px; text-transform:uppercase; letter-spacing:.5px; color:#8a97a8; padding:12px 20px; border-bottom:2px solid #eef2f6; }
+    td { padding:11px 20px; border-bottom:1px solid #f4f7fa; font-size:14px; }
+    .dom { font-weight:600; color:#1e3a5f; }
+    .cli { color:#6b7a8d; font-family:monospace; font-size:13px; }
+    .tag { display:inline-block; padding:3px 10px; border-radius:20px; font-size:12px; font-weight:600; }
+    .tag.ok { background:#e6f6ec; color:#1e7e45; }
+    .tag.block { background:#fde8e8; color:#c0392b; }
+    .empty { text-align:center; color:#8a97a8; padding:40px; font-size:14px; }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand">NetGate</div>
+    <div><span style="margin-right:16px;font-size:14px;">{{ user }}</span><a href="/logout">Cikis</a></div>
+  </div>
+  <div class="layout">
+    <nav class="side">
+      <a href="/">Genel Bakis</a>
+      <a href="/devices">Cihazlar</a>
+      <a href="/blocklist">Site Engelleme</a>
+      <a href="/logs" class="active">Loglar</a>
+      <a href="#">Kullanicilar</a>
+      <a href="#">Ayarlar</a>
+    </nav>
+    <div class="main">
+      <div class="h1">Trafik Loglari</div>
+      <div class="muted">DNS sorgulari - hangi cihaz hangi siteye erismek istedi</div>
+
+      <div class="stats">
+        <div class="stat"><div class="k">Toplam Sorgu</div><div class="v">{{ stats.total }}</div></div>
+        <div class="stat green"><div class="k">Izin Verilen</div><div class="v">{{ stats.allowed }}</div></div>
+        <div class="stat red"><div class="k">Engellenen</div><div class="v">{{ stats.blocked }}</div></div>
+      </div>
+
+      <form method="get" action="/logs" class="toolbar">
+        <input type="text" name="q" placeholder="Alan adi veya IP ara..." value="{{ search }}">
+        <button type="submit">Ara</button>
+        <a href="/logs" class="{% if not only_blocked %}active{% endif %}">Tumu</a>
+        <a href="/logs?filter=blocked" class="{% if only_blocked %}active{% endif %}">Sadece Engellenenler</a>
+      </form>
+
+      <div class="panel">
+        {% if logs %}
+        <table>
+          <thead>
+            <tr><th>Zaman</th><th>Istemci IP</th><th>Alan Adi</th><th>Durum</th></tr>
+          </thead>
+          <tbody>
+            {% for r in logs %}
+            <tr>
+              <td>{{ r.time }}</td>
+              <td class="cli">{{ r.client }}</td>
+              <td class="dom">{{ r.domain }}</td>
+              <td>
+                {% if r.blocked %}<span class="tag block">Engellendi</span>
+                {% else %}<span class="tag ok">Izin</span>{% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <div class="empty">Henuz log kaydi yok. Bir DNS sorgusu yapildiginda burada gorunecek.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</body>
+</html>
