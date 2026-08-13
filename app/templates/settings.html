@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NetGate - Ayarlar</title>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
+    body { background:#eef2f6; color:#243447; }
+    .topbar { background:#1e3a5f; color:#fff; padding:0 24px; height:60px; display:flex; align-items:center; justify-content:space-between; }
+    .topbar .brand { font-size:19px; font-weight:700; }
+    .topbar a { color:#cfe0f0; text-decoration:none; font-size:14px; }
+    .topbar a:hover { color:#fff; }
+    .layout { display:flex; min-height:calc(100vh - 60px); }
+    .side { width:220px; background:#fff; border-right:1px solid #e2e8ef; padding:18px 0; }
+    .side a { display:block; padding:12px 24px; color:#4a5b6e; text-decoration:none; font-size:14px; border-left:3px solid transparent; }
+    .side a:hover { background:#f4f7fa; border-left-color:#2b6cb0; color:#1e3a5f; }
+    .side a.active { background:#eef5fc; border-left-color:#2b6cb0; color:#1e3a5f; font-weight:600; }
+    .main { flex:1; padding:28px; }
+    .h1 { font-size:22px; margin-bottom:4px; }
+    .muted { color:#8a97a8; font-size:14px; margin-bottom:24px; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:18px; margin-bottom:22px; }
+    .panel { background:#fff; border-radius:12px; padding:22px; box-shadow:0 2px 8px rgba(0,0,0,.04); }
+    .panel h3 { font-size:15px; color:#1e3a5f; margin-bottom:16px; }
+    .row { display:flex; justify-content:space-between; padding:9px 0; border-bottom:1px solid #f4f7fa; font-size:14px; }
+    .row:last-child { border-bottom:none; }
+    .row .lbl { color:#6b7a8d; }
+    .row .val { font-weight:600; color:#1e3a5f; }
+    .bar { height:8px; background:#eef2f6; border-radius:4px; overflow:hidden; margin-top:6px; }
+    .bar span { display:block; height:100%; background:#2b6cb0; }
+    .bar span.hi { background:#c0392b; }
+    .badge { display:inline-block; padding:3px 10px; border-radius:20px; font-size:12px; font-weight:600; }
+    .badge.on { background:#e6f6ec; color:#1e7e45; }
+    .badge.off { background:#fde8e8; color:#c0392b; }
+    .btn { display:inline-block; padding:10px 18px; background:#2b6cb0; color:#fff; border:none; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer; text-decoration:none; }
+    .btn:hover { background:#245a94; }
+    .btn.gray { background:#eef2f6; color:#4a5b6e; }
+    .fileform { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:12px; }
+    .fileform input[type=file] { font-size:13px; }
+    .msg { padding:11px 16px; border-radius:8px; font-size:14px; margin-bottom:18px; }
+    .msg.ok { background:#e6f6ec; color:#1e7e45; }
+    .msg.warn { background:#fef3e0; color:#b26a00; }
+    .desc { font-size:13px; color:#8a97a8; margin-bottom:10px; }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand">NetGate</div>
+    <div><span style="margin-right:16px;font-size:14px;">{{ user }}</span><a href="/logout">Cikis</a></div>
+  </div>
+  <div class="layout">
+    <nav class="side">
+      <a href="/">Genel Bakis</a>
+      <a href="/devices">Cihazlar</a>
+      <a href="/blocklist">Site Engelleme</a>
+      <a href="/logs">Loglar</a>
+      <a href="/users">Kullanicilar</a>
+      <a href="/settings" class="active">Ayarlar</a>
+    </nav>
+    <div class="main">
+      <div class="h1">Ayarlar ve Sistem Durumu</div>
+      <div class="muted">Sistem sagligi, servisler ve yedekleme</div>
+
+      {% if msg and msg.startswith("import_") and msg != "import_hata" %}
+        <div class="msg ok">{{ msg.split("_")[1] }} site yedekten yuklendi.</div>
+      {% elif msg == "import_hata" %}
+        <div class="msg warn">Yedek dosyasi okunamadi. Gecerli bir JSON dosyasi secin.</div>
+      {% endif %}
+
+      <div class="grid">
+        <div class="panel">
+          <h3>Sistem</h3>
+          <div class="row"><span class="lbl">Calisma suresi</span><span class="val">{{ info.uptime }}</span></div>
+          <div class="row"><span class="lbl">Disk</span><span class="val">{{ info.disk_used }} / {{ info.disk_total }}</span></div>
+          <div class="bar"><span class="{% if info.disk_percent > 85 %}hi{% endif %}" style="width: {{ info.disk_percent }}%"></span></div>
+          <div class="row" style="margin-top:12px;"><span class="lbl">RAM</span><span class="val">{{ info.ram_used }} / {{ info.ram_total }}</span></div>
+          <div class="bar"><span class="{% if info.ram_percent > 85 %}hi{% endif %}" style="width: {{ info.ram_percent }}%"></span></div>
+        </div>
+
+        <div class="panel">
+          <h3>Servisler</h3>
+          <div class="row">
+            <span class="lbl">Web Panel (netgate)</span>
+            <span class="badge {% if info.netgate == 'active' %}on{% else %}off{% endif %}">{{ info.netgate }}</span>
+          </div>
+          <div class="row">
+            <span class="lbl">DNS / DHCP (dnsmasq)</span>
+            <span class="badge {% if info.dnsmasq == 'active' %}on{% else %}off{% endif %}">{{ info.dnsmasq }}</span>
+          </div>
+          <div class="row">
+            <span class="lbl">Ust DNS Sunuculari</span>
+            <span class="val">{{ info.dns_upstreams|join(", ") }}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>Yedekleme</h3>
+        <div class="desc">Engelli site listesini bir dosyaya kaydedin veya yedekten geri yukleyin. Baska bir makineye tasirken de kullanilir.</div>
+        <a class="btn" href="/settings/export">Yedegi Indir (JSON)</a>
+        <form class="fileform" method="post" action="/settings/import" enctype="multipart/form-data">
+          <input type="file" name="backup_file" accept=".json" required>
+          <button class="btn gray" type="submit">Yedekten Yukle</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

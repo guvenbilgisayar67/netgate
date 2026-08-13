@@ -4,7 +4,8 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 import secrets, pathlib
-from app import db, logs, devices, users
+from app import db, logs, devices, users, settings
+import json
 
 BASE = pathlib.Path(__file__).parent
 app = FastAPI(title="NetGate")
@@ -169,3 +170,43 @@ def users_delete(request: Request, user_id: int = Form(...)):
         return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
     ok, msg = users.delete_user(user_id)
     return RedirectResponse(f"/users?msg={'silindi' if ok else 'hata'}", status_code=status.HTTP_303_SEE_OTHER)
+# ---------- Ayarlar ----------
+
+@app.get("/settings", response_class=HTMLResponse)
+def settings_page(request: Request):
+    if not is_logged_in(request):
+        return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
+    return templates.TemplateResponse(request, "settings.html", {
+        "user": request.session["user"],
+        "info": settings.system_info(),
+        "msg": request.query_params.get("msg"),
+    })
+
+@app.get("/settings/export")
+def settings_export(request: Request):
+    if not is_logged_in(request):
+        return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
+    from fastapi.responses import Response
+    data = settings.export_config()
+    content = json.dumps(data, indent=2, ensure_ascii=False)
+    return Response(
+        content=content,
+        media_type="application/json",
+        headers={"Content-Disposition": "attachment; filename=netgate-yedek.json"}
+    )
+
+@app.post("/settings/import")
+async def settings_import(request: Request):
+    if not is_logged_in(request):
+        return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
+    form = await request.form()
+    upload = form.get("backup_file")
+    if upload:
+        try:
+            content = await upload.read()
+            data = json.loads(content)
+            count = settings.import_config(data)
+            return RedirectResponse(f"/settings?msg=import_{count}", status_code=status.HTTP_303_SEE_OTHER)
+        except Exception:
+            return RedirectResponse("/settings?msg=import_hata", status_code=status.HTTP_303_SEE_OTHER)
+    return RedirectResponse("/settings?msg=import_hata", status_code=status.HTTP_303_SEE_OTHER)
