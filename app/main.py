@@ -81,10 +81,22 @@ def dashboard(request: Request):
     if not is_logged_in(request):
         return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
     domains = db.list_domains()
+    log_stats = logs.log_stats()
+    recent_logs = logs.read_dns_logs(limit=8)
+    cats = categories.get_states()
+    active_cats = sum(1 for c in cats.values() if c["enabled"])
+    total_blocked_sites = sum(c["count"] for c in cats.values() if c["enabled"]) + len(domains)
+    sessions = portal.list_sessions(active_only=True)
     return templates.TemplateResponse(request, "dashboard.html", {
         "user": request.session["user"],
         "blocked_count": len(domains),
         "device_count": devices.device_count(),
+        "log_stats": log_stats,
+        "recent_logs": recent_logs,
+        "active_cats": active_cats,
+        "total_blocked_sites": total_blocked_sites,
+        "portal_enabled": portal.is_enabled(),
+        "active_sessions": len(sessions),
     })
 
 # ---------- Site Engelleme ----------

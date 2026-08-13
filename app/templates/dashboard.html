@@ -19,14 +19,32 @@
     .main { flex:1; padding:28px; }
     .h1 { font-size:22px; margin-bottom:4px; }
     .muted { color:#8a97a8; font-size:14px; margin-bottom:24px; }
-    .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:18px; }
-    .card { background:#fff; border-radius:12px; padding:22px; box-shadow:0 2px 8px rgba(0,0,0,.04); }
-    .card .k { font-size:13px; color:#8a97a8; text-transform:uppercase; letter-spacing:.5px; }
-    .card .v { font-size:30px; font-weight:700; margin-top:8px; color:#1e3a5f; }
-    .card .badge { font-size:12px; color:#8a97a8; margin-top:6px; }
-    .soon { margin-top:28px; background:#fff; border-radius:12px; padding:22px; box-shadow:0 2px 8px rgba(0,0,0,.04); }
-    .soon h3 { font-size:16px; margin-bottom:10px; color:#1e3a5f; }
-    .soon p { color:#6b7a8d; font-size:14px; line-height:1.6; }
+    .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:16px; margin-bottom:22px; }
+    .card { background:#fff; border-radius:12px; padding:20px; box-shadow:0 2px 8px rgba(0,0,0,.04); }
+    .card .k { font-size:12px; color:#8a97a8; text-transform:uppercase; letter-spacing:.5px; }
+    .card .v { font-size:28px; font-weight:700; margin-top:6px; color:#1e3a5f; }
+    .card .badge { font-size:12px; color:#8a97a8; margin-top:4px; }
+    .card .v.green { color:#1e7e45; }
+    .card .v.red { color:#c0392b; }
+    .card .v.small { font-size:20px; }
+    .row2 { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+    @media (max-width:900px){ .row2 { grid-template-columns:1fr; } }
+    .panel { background:#fff; border-radius:12px; padding:22px; box-shadow:0 2px 8px rgba(0,0,0,.04); }
+    .panel h3 { font-size:15px; color:#1e3a5f; margin-bottom:16px; }
+    .bar-wrap { margin:14px 0; }
+    .bar-lbl { display:flex; justify-content:space-between; font-size:13px; color:#6b7a8d; margin-bottom:6px; }
+    .bar { height:10px; background:#eef2f6; border-radius:5px; overflow:hidden; display:flex; }
+    .bar .allow { background:#1e7e45; height:100%; }
+    .bar .block { background:#c0392b; height:100%; }
+    .loglist { list-style:none; }
+    .loglist li { display:flex; justify-content:space-between; align-items:center; padding:9px 0; border-bottom:1px solid #f4f7fa; font-size:13px; }
+    .loglist li:last-child { border-bottom:none; }
+    .loglist .dom { font-weight:600; color:#1e3a5f; }
+    .loglist .cli { font-family:monospace; color:#8a97a8; font-size:12px; }
+    .tag { display:inline-block; padding:2px 9px; border-radius:20px; font-size:11px; font-weight:600; }
+    .tag.ok { background:#e6f6ec; color:#1e7e45; }
+    .tag.block { background:#fde8e8; color:#c0392b; }
+    .empty { text-align:center; color:#8a97a8; padding:20px; font-size:13px; }
   </style>
 </head>
 <body>
@@ -48,15 +66,51 @@
     <div class="main">
       <div class="h1">Genel Bakis</div>
       <div class="muted">Ag durumu ve ozet bilgiler</div>
+
       <div class="cards">
-        <div class="card"><div class="k">Bagli Cihaz</div><div class="v">-</div><div class="badge">Faz 2'de aktif olacak</div></div>
-        <div class="card"><div class="k">Anlik Trafik</div><div class="v">-</div><div class="badge">Faz 2'de aktif olacak</div></div>
-        <div class="card"><div class="k">Engelli Site</div><div class="v">{{ blocked_count }}</div><div class="badge">Aktif liste</div></div>
-        <div class="card"><div class="k">Gateway Durumu</div><div class="v" style="color:#27ae60;font-size:22px;">Calisiyor</div><div class="badge">Panel aktif</div></div>
+        <div class="card"><div class="k">Bagli Cihaz</div><div class="v">{{ device_count }}</div><div class="badge">Agda gorunen</div></div>
+        <div class="card"><div class="k">Engelli Site</div><div class="v">{{ "{:,}".format(total_blocked_sites) }}</div><div class="badge">{{ blocked_count }} elle + {{ active_cats }} kategori</div></div>
+        <div class="card"><div class="k">Aktif Oturum</div><div class="v small">{{ active_sessions }}</div><div class="badge">Captive portal: {% if portal_enabled %}<span style="color:#1e7e45;">acik</span>{% else %}kapali{% endif %}</div></div>
+        <div class="card"><div class="k">Gateway</div><div class="v green small">Calisiyor</div><div class="badge">Panel aktif</div></div>
       </div>
-      <div class="soon">
-        <h3>NetGate paneline hos geldin</h3>
-        <p>Giris sistemi ve panel iskeleti calisiyor. Siradaki adim: Site Engelleme modulu.</p>
+
+      <div class="row2">
+        <div class="panel">
+          <h3>DNS Trafigi (son kayitlar)</h3>
+          {% set total = log_stats.total if log_stats.total > 0 else 1 %}
+          {% set allow_pct = (log_stats.allowed / total * 100)|round %}
+          {% set block_pct = (log_stats.blocked / total * 100)|round %}
+          <div class="bar-wrap">
+            <div class="bar-lbl">
+              <span>Izin: {{ log_stats.allowed }}</span>
+              <span>Engel: {{ log_stats.blocked }}</span>
+            </div>
+            <div class="bar">
+              <div class="allow" style="width: {{ allow_pct }}%"></div>
+              <div class="block" style="width: {{ block_pct }}%"></div>
+            </div>
+          </div>
+          <div style="font-size:13px;color:#8a97a8;margin-top:10px;">Toplam {{ log_stats.total }} sorgu izlendi. Engellenme orani: %{{ block_pct }}</div>
+        </div>
+
+        <div class="panel">
+          <h3>Son DNS Sorgulari</h3>
+          {% if recent_logs %}
+          <ul class="loglist">
+            {% for r in recent_logs %}
+            <li>
+              <div>
+                <span class="dom">{{ r.domain }}</span><br>
+                <span class="cli">{{ r.client }} · {{ r.time }}</span>
+              </div>
+              {% if r.blocked %}<span class="tag block">engel</span>{% else %}<span class="tag ok">izin</span>{% endif %}
+            </li>
+            {% endfor %}
+          </ul>
+          {% else %}
+          <div class="empty">Henuz DNS sorgusu kaydi yok.</div>
+          {% endif %}
+        </div>
       </div>
     </div>
   </div>
