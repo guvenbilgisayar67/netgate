@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NetGate - Captive Portal</title>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
+    body { background:#eef2f6; color:#243447; }
+    .topbar { background:#1e3a5f; color:#fff; padding:0 24px; height:60px; display:flex; align-items:center; justify-content:space-between; }
+    .topbar .brand { font-size:19px; font-weight:700; }
+    .topbar a { color:#cfe0f0; text-decoration:none; font-size:14px; }
+    .layout { display:flex; min-height:calc(100vh - 60px); }
+    .side { width:220px; background:#fff; border-right:1px solid #e2e8ef; padding:18px 0; }
+    .side a { display:block; padding:12px 24px; color:#4a5b6e; text-decoration:none; font-size:14px; border-left:3px solid transparent; }
+    .side a:hover { background:#f4f7fa; border-left-color:#2b6cb0; color:#1e3a5f; }
+    .side a.active { background:#eef5fc; border-left-color:#2b6cb0; color:#1e3a5f; font-weight:600; }
+    .main { flex:1; padding:28px; }
+    .h1 { font-size:22px; margin-bottom:4px; }
+    .muted { color:#8a97a8; font-size:14px; margin-bottom:24px; }
+    .panel { background:#fff; border-radius:12px; padding:22px; box-shadow:0 2px 8px rgba(0,0,0,.04); margin-bottom:22px; }
+    .panel h3 { font-size:15px; color:#1e3a5f; margin-bottom:16px; }
+    .toggle-row { display:flex; align-items:center; justify-content:space-between; }
+    .toggle-row .info { font-size:14px; }
+    .status-big { font-size:16px; font-weight:700; }
+    .status-big.on { color:#1e7e45; }
+    .status-big.off { color:#c0392b; }
+    .btn { padding:10px 20px; border:none; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer; }
+    .btn.green { background:#1e7e45; color:#fff; }
+    .btn.red { background:#c0392b; color:#fff; }
+    .btn.blue { background:#2b6cb0; color:#fff; }
+    .btn.small { padding:7px 14px; font-size:13px; }
+    .form-row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+    .form-row input { padding:10px; border:1px solid #d5dde6; border-radius:8px; font-size:14px; }
+    .form-row input.sm { width:90px; }
+    table { width:100%; border-collapse:collapse; }
+    th { text-align:left; font-size:12px; text-transform:uppercase; letter-spacing:.5px; color:#8a97a8; padding:10px 12px; border-bottom:2px solid #eef2f6; }
+    td { padding:11px 12px; border-bottom:1px solid #f4f7fa; font-size:14px; }
+    .code { font-family:monospace; font-weight:700; color:#1e3a5f; font-size:15px; letter-spacing:1px; }
+    .del { background:#fde8e8; color:#c0392b; border:none; padding:6px 12px; border-radius:6px; font-size:13px; cursor:pointer; }
+    .tag { display:inline-block; padding:3px 10px; border-radius:20px; font-size:12px; font-weight:600; }
+    .tag.used { background:#fde8e8; color:#c0392b; }
+    .tag.free { background:#e6f6ec; color:#1e7e45; }
+    .msg { padding:11px 16px; border-radius:8px; font-size:14px; margin-bottom:18px; background:#e6f6ec; color:#1e7e45; }
+    .empty { text-align:center; color:#8a97a8; padding:24px; font-size:14px; }
+    .link-hint { font-size:13px; color:#8a97a8; margin-top:8px; }
+    .link-hint a { color:#2b6cb0; }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand">NetGate</div>
+    <div><span style="margin-right:16px;font-size:14px;">{{ user }}</span><a href="/logout">Cikis</a></div>
+  </div>
+  <div class="layout">
+    <nav class="side">
+      <a href="/">Genel Bakis</a>
+      <a href="/devices">Cihazlar</a>
+      <a href="/blocklist">Site Engelleme</a>
+      <a href="/categories">Kategoriler</a>
+      <a href="/portal" class="active">Captive Portal</a>
+      <a href="/logs">Loglar</a>
+      <a href="/users">Kullanicilar</a>
+      <a href="/settings">Ayarlar</a>
+    </nav>
+    <div class="main">
+      <div class="h1">Captive Portal Yonetimi</div>
+      <div class="muted">Misafir girisi, kullanici hesaplari ve aktif oturumlar</div>
+
+      {% if msg %}<div class="msg">Islem tamamlandi.</div>{% endif %}
+
+      <div class="panel">
+        <div class="toggle-row">
+          <div class="info">
+            Portal Durumu:
+            {% if enabled %}<span class="status-big on">ACIK</span>{% else %}<span class="status-big off">KAPALI</span>{% endif %}
+            <div class="link-hint">Kullanici giris ekrani: <a href="/hotspot" target="_blank">/hotspot</a> (test icin)</div>
+          </div>
+          <form method="post" action="/portal/toggle">
+            {% if enabled %}<button class="btn red" type="submit">Portali Kapat</button>
+            {% else %}<button class="btn green" type="submit">Portali Ac</button>{% endif %}
+          </form>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>Kalici Kullanici Ekle (personel / ogrenci)</h3>
+        <form class="form-row" method="post" action="/portal/user/add">
+          <input type="text" name="username" placeholder="Kullanici adi" required>
+          <input type="password" name="password" placeholder="Sifre" required>
+          <input type="text" name="full_name" placeholder="Ad Soyad (istege bagli)">
+          <input class="sm" type="number" name="duration_min" placeholder="Dakika" value="60" title="Oturum suresi (dakika)">
+          <button class="btn blue" type="submit">Ekle</button>
+        </form>
+        {% if portal_users %}
+        <table style="margin-top:16px;">
+          <thead><tr><th>Kullanici</th><th>Ad Soyad</th><th>Sure</th><th></th></tr></thead>
+          <tbody>
+            {% for u in portal_users %}
+            <tr>
+              <td class="code" style="font-size:14px;">{{ u.username }}</td>
+              <td>{{ u.full_name or "-" }}</td>
+              <td>{{ u.duration_min }} dk</td>
+              <td style="text-align:right;">
+                <form method="post" action="/portal/user/delete" style="display:inline;">
+                  <input type="hidden" name="uid" value="{{ u.id }}">
+                  <button class="del" type="submit">Sil</button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}<div class="empty">Henuz kalici kullanici yok.</div>{% endif %}
+      </div>
+
+      <div class="panel">
+        <h3>Misafir Kodu Uret</h3>
+        <form class="form-row" method="post" action="/portal/code/add">
+          <input type="text" name="note" placeholder="Not (orn. Veli toplantisi)">
+          <input class="sm" type="number" name="duration_min" value="120" title="Sure (dakika)">
+          <input class="sm" type="number" name="count" value="1" title="Kac adet">
+          <button class="btn blue" type="submit">Kod Uret</button>
+        </form>
+        {% if codes %}
+        <table style="margin-top:16px;">
+          <thead><tr><th>Kod</th><th>Not</th><th>Sure</th><th>Durum</th><th></th></tr></thead>
+          <tbody>
+            {% for c in codes %}
+            <tr>
+              <td class="code">{{ c.code }}</td>
+              <td>{{ c.note or "-" }}</td>
+              <td>{{ c.duration_min }} dk</td>
+              <td>{% if c.used %}<span class="tag used">Kullanildi</span>{% else %}<span class="tag free">Bekliyor</span>{% endif %}</td>
+              <td style="text-align:right;">
+                <form method="post" action="/portal/code/delete" style="display:inline;">
+                  <input type="hidden" name="cid" value="{{ c.id }}">
+                  <button class="del" type="submit">Sil</button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}<div class="empty">Henuz kod uretilmedi.</div>{% endif %}
+      </div>
+
+      <div class="panel">
+        <h3>Aktif Oturumlar</h3>
+        {% if sessions %}
+        <table>
+          <thead><tr><th>Kimlik</th><th>Yontem</th><th>IP</th><th>Baslangic</th><th>Bitis</th><th></th></tr></thead>
+          <tbody>
+            {% for s in sessions %}
+            <tr>
+              <td class="code" style="font-size:14px;">{{ s.identity }}</td>
+              <td>{{ s.method }}</td>
+              <td style="font-family:monospace;font-size:13px;">{{ s.ip or "-" }}</td>
+              <td>{{ s.started }}</td>
+              <td>{{ s.expires }}</td>
+              <td style="text-align:right;">
+                <form method="post" action="/portal/session/end" style="display:inline;">
+                  <input type="hidden" name="sid" value="{{ s.id }}">
+                  <button class="del" type="submit">Sonlandir</button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}<div class="empty">Aktif oturum yok.</div>{% endif %}
+      </div>
+    </div>
+  </div>
+</body>
+</html>

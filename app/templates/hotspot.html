@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Internet Erisimi - Giris</title>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
+    body { min-height:100vh; display:flex; align-items:center; justify-content:center; background:linear-gradient(135deg,#1e3a5f,#0f1c2e); padding:20px; }
+    .box { background:#fff; padding:38px 34px; border-radius:16px; box-shadow:0 20px 60px rgba(0,0,0,.4); width:100%; max-width:380px; }
+    .logo { text-align:center; font-size:26px; font-weight:700; color:#1e3a5f; margin-bottom:6px; }
+    .sub { text-align:center; color:#8a97a8; font-size:13px; margin-bottom:24px; }
+    .tabs { display:flex; gap:8px; margin-bottom:20px; }
+    .tabs button { flex:1; padding:10px; border:1px solid #d5dde6; background:#f7f9fb; border-radius:8px; font-size:13px; cursor:pointer; color:#5a6b7f; }
+    .tabs button.active { background:#2b6cb0; color:#fff; border-color:#2b6cb0; }
+    label { display:block; font-size:13px; color:#5a6b7f; margin:12px 0 6px; }
+    input { width:100%; padding:12px; border:1px solid #d5dde6; border-radius:8px; font-size:14px; }
+    input:focus { outline:none; border-color:#2b6cb0; }
+    input.code-in { text-align:center; font-size:22px; letter-spacing:4px; font-family:monospace; text-transform:uppercase; }
+    button.submit { width:100%; margin-top:20px; padding:13px; background:#2b6cb0; color:#fff; border:none; border-radius:8px; font-size:15px; font-weight:600; cursor:pointer; }
+    button.submit:hover { background:#245a94; }
+    .err { background:#fde8e8; color:#c0392b; padding:11px; border-radius:8px; font-size:13px; margin-bottom:16px; text-align:center; }
+    .ok { background:#e6f6ec; color:#1e7e45; padding:16px; border-radius:8px; font-size:14px; text-align:center; }
+    .ok .big { font-size:18px; font-weight:700; margin-bottom:6px; }
+    .hidden { display:none; }
+    .foot { text-align:center; margin-top:18px; font-size:12px; color:#b0bcc9; }
+  </style>
+</head>
+<body>
+  <div class="box">
+    <div class="logo">Internet Erisimi</div>
+    <div class="sub">Baglanmak icin giris yapin</div>
+
+    {% if success %}
+      <div class="ok">
+        <div class="big">Baglandiniz!</div>
+        {{ success }}<br>Artik internete erisebilirsiniz.
+      </div>
+    {% else %}
+      {% if error %}<div class="err">{{ error }}</div>{% endif %}
+
+      <div class="tabs">
+        <button type="button" id="tab-account" class="active" onclick="showTab('account')">Hesap</button>
+        <button type="button" id="tab-code" onclick="showTab('code')">Misafir Kodu</button>
+      </div>
+
+      <form method="post" action="/hotspot" id="form-account">
+        <label>Kullanici Adi</label>
+        <input type="text" name="identity" autocomplete="username">
+        <label>Sifre</label>
+        <input type="password" name="secret" autocomplete="current-password">
+        <button class="submit" type="submit">Giris Yap</button>
+      </form>
+
+      <form method="post" action="/hotspot" id="form-code" class="hidden">
+        <input type="hidden" name="identity" value="">
+        <label>Size verilen 6 haneli kod</label>
+        <input class="code-in" type="text" name="secret" maxlength="6" placeholder="ABC123">
+        <button class="submit" type="submit">Baglan</button>
+      </form>
+    {% endif %}
+
+    <div class="foot">NetGate</div>
+  </div>
+
+  <script>
+    function showTab(which) {
+      var acc = document.getElementById('form-account');
+      var cod = document.getElementById('form-code');
+      var ta = document.getElementById('tab-account');
+      var tc = document.getElementById('tab-code');
+      if (which === 'account') {
+        acc.classList.remove('hidden'); cod.classList.add('hidden');
+        ta.classList.add('active'); tc.classList.remove('active');
+      } else {
+        cod.classList.remove('hidden'); acc.classList.add('hidden');
+        tc.classList.add('active'); ta.classList.remove('active');
+      }
+    }
+  </script>
+</body>
+</html>

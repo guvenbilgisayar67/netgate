@@ -4,7 +4,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 import secrets, pathlib
-from app import db, logs, devices, users, settings, categories
+from app import db, logs, devices, users, settings, categories, portal
 import json
 
 BASE = pathlib.Path(__file__).parent
@@ -16,6 +16,7 @@ templates = Jinja2Templates(directory=BASE / "templates")
 db.init_db()
 users.init_users()
 categories.init_categories()
+portal.init_portal()
 
 def is_logged_in(request: Request) -> bool:
     return request.session.get("user") is not None
@@ -233,3 +234,75 @@ def categories_toggle(request: Request, key: str = Form(...), action: str = Form
         ok, msg = categories.disable_category(key)
     return RedirectResponse("/categories?msg=" + ("ok" if ok else "hata"),
                             status_code=status.HTTP_303_SEE_OTHER)
+# ---------- Captive Portal: Yonetim ----------
+
+@app.get("/portal", response_class=HTMLResponse)
+def portal_admin(request: Request):
+    if not is_logged_in(request):
+        return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
+    return templates.TemplateResponse(request, "portal_admin.html", {
+        "user": request.session["user"],
+        "enabled": portal.is_enabled(),
+        "portal_users": portal.list_portal_users(),
+        "codes": portal.list_codes(),
+        "sessions": portal.list_sessions(active_only=True),
+        "msg": request.query_params.get("msg"),
+    })
+
+@app.post("/portal/toggle")
+def portal_toggle(request: Request):
+    if not is_logged_in(request):
+        return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
+    portal.set_enabled(not portal.is_enabled())
+    return RedirectResponse("/portal?msg=toggle", status_code=status.HTTP_303_SEE_OTHER)
+
+@app.post("/portal/user/add")
+def portal_user_add(request: Request, username: str = Form(...), password: str = Form(...),
+                    full_name: str = Form(""), duration_min: int = Form(60)):
+    if not is_logged_in(request):
+        return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
+    portal.add_portal_user(username, password, full_name, duration_min)
+    return RedirectResponse("/portal?msg=user_add", status_code=status.HTTP_303_SEE_OTHER)
+
+@app.post("/portal/user/delete")
+def portal_user_delete(request: Request, uid: int = Form(...)):
+    if not is_logged_in(request):
+        return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
+    portal.delete_portal_user(uid)
+    return RedirectResponse("/portal?msg=user_del", status_code=status.HTTP_303_SEE_OTHER)
+
+@app.post("/portal/code/add")
+def portal_code_add(request: Request, note: str = Form(""), duration_min: int = Form(60), count: int = Form(1)):
+    if not is_logged_in(request):
+        return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
+    portal.generate_code(note, duration_min, count)
+    return RedirectResponse("/portal?msg=code_add", status_code=status.HTTP_303_SEE_OTHER)
+
+@app.post("/portal/code/delete")
+def portal_code_delete(request: Request, cid: int = Form(...)):
+    if not is_logged_in(request):
+        return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
+    portal.delete_code(cid)
+    return RedirectResponse("/portal?msg=code_del", status_code=status.HTTP_303_SEE_OTHER)
+
+@app.post("/portal/session/end")
+def portal_session_end(request: Request, sid: int = Form(...)):
+    if not is_logged_in(request):
+        return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
+    portal.end_session(sid)
+    return RedirectResponse("/portal?msg=sess_end", status_code=status.HTTP_303_SEE_OTHER)
+
+# ---------- Captive Portal: Kullanici Giris Ekrani ----------
+# (Gercek makinede, giris yapmamis cihazlar buraya yonlendirilecek)
+
+@app.get("/hotspot", response_class=HTMLResponse)
+def hotspot_page(request: Request):
+    return templates.TemplateResponse(request, "hotspot.html", {"error": None})
+
+@app.post("/hotspot")
+def hotspot_login(request: Request, identity: str = Form(""), secret: str = Form(...)):
+    client_ip = request.client.host if request.client else ""
+    ok, msg = portal.portal_login(identity, secret, ip=client_ip, mac="")
+    if ok:
+        return templates.TemplateResponse(request, "hotspot.html", {"error": None, "success": msg})
+    return templates.TemplateResponse(request, "hotspot.html", {"error": msg})
