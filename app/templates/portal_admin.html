@@ -21,7 +21,6 @@
     .panel { background:#fff; border-radius:12px; padding:22px; box-shadow:0 2px 8px rgba(0,0,0,.04); margin-bottom:22px; }
     .panel h3 { font-size:15px; color:#1e3a5f; margin-bottom:16px; }
     .toggle-row { display:flex; align-items:center; justify-content:space-between; }
-    .toggle-row .info { font-size:14px; }
     .status-big { font-size:16px; font-weight:700; }
     .status-big.on { color:#1e7e45; }
     .status-big.off { color:#c0392b; }
@@ -29,9 +28,8 @@
     .btn.green { background:#1e7e45; color:#fff; }
     .btn.red { background:#c0392b; color:#fff; }
     .btn.blue { background:#2b6cb0; color:#fff; }
-    .btn.small { padding:7px 14px; font-size:13px; }
     .form-row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
-    .form-row input { padding:10px; border:1px solid #d5dde6; border-radius:8px; font-size:14px; }
+    .form-row input, .form-row select { padding:10px; border:1px solid #d5dde6; border-radius:8px; font-size:14px; }
     .form-row input.sm { width:90px; }
     table { width:100%; border-collapse:collapse; }
     th { text-align:left; font-size:12px; text-transform:uppercase; letter-spacing:.5px; color:#8a97a8; padding:10px 12px; border-bottom:2px solid #eef2f6; }
@@ -41,10 +39,15 @@
     .tag { display:inline-block; padding:3px 10px; border-radius:20px; font-size:12px; font-weight:600; }
     .tag.used { background:#fde8e8; color:#c0392b; }
     .tag.free { background:#e6f6ec; color:#1e7e45; }
+    .tag.grp { background:#e6f0fb; color:#2b6cb0; }
     .msg { padding:11px 16px; border-radius:8px; font-size:14px; margin-bottom:18px; background:#e6f6ec; color:#1e7e45; }
     .empty { text-align:center; color:#8a97a8; padding:24px; font-size:14px; }
     .link-hint { font-size:13px; color:#8a97a8; margin-top:8px; }
     .link-hint a { color:#2b6cb0; }
+    .grp-item { border:1px solid #eef2f6; border-radius:10px; padding:14px; margin-bottom:12px; }
+    .grp-item .gname { font-weight:700; color:#1e3a5f; text-transform:capitalize; margin-bottom:4px; }
+    .grp-item .gdesc { font-size:13px; color:#8a97a8; margin-bottom:10px; }
+    .chk { display:inline-flex; align-items:center; gap:6px; margin-right:14px; font-size:13px; }
   </style>
 </head>
 <body>
@@ -65,13 +68,13 @@
     </nav>
     <div class="main">
       <div class="h1">Captive Portal Yonetimi</div>
-      <div class="muted">Misafir girisi, kullanici hesaplari ve aktif oturumlar</div>
+      <div class="muted">Misafir girisi, gruplar, hesaplar ve aktif oturumlar</div>
 
       {% if msg %}<div class="msg">Islem tamamlandi.</div>{% endif %}
 
       <div class="panel">
         <div class="toggle-row">
-          <div class="info">
+          <div>
             Portal Durumu:
             {% if enabled %}<span class="status-big on">ACIK</span>{% else %}<span class="status-big off">KAPALI</span>{% endif %}
             <div class="link-hint">Kullanici giris ekrani: <a href="/hotspot" target="_blank">/hotspot</a> (test icin)</div>
@@ -84,22 +87,46 @@
       </div>
 
       <div class="panel">
-        <h3>Kalici Kullanici Ekle (personel / ogrenci)</h3>
+        <h3>Gruplar ve Filtre Profilleri</h3>
+        <div class="muted" style="margin-bottom:14px;">Her grubun hangi kategorileri engelleyecegini belirleyin. Kullanici giris yapinca grubunun filtresi uygulanir.</div>
+        {% for g in groups %}
+        <div class="grp-item">
+          <div class="gname">{{ g.name }}</div>
+          <div class="gdesc">{{ g.description }}</div>
+          <form method="post" action="/portal/group/update">
+            <input type="hidden" name="name" value="{{ g.name }}">
+            {% set cats = g.categories.split(",") if g.categories else [] %}
+            <label class="chk"><input type="checkbox" name="c_ads" {% if "ads" in cats %}checked{% endif %}> Reklam</label>
+            <label class="chk"><input type="checkbox" name="c_adult" {% if "adult" in cats %}checked{% endif %}> Yetiskin</label>
+            <label class="chk"><input type="checkbox" name="c_social" {% if "social" in cats %}checked{% endif %}> Sosyal Medya</label>
+            <label class="chk"><input type="checkbox" name="c_games" {% if "games" in cats %}checked{% endif %}> Oyun</label>
+            <button class="btn blue" type="submit" style="margin-left:10px;padding:7px 16px;font-size:13px;">Kaydet</button>
+          </form>
+        </div>
+        {% endfor %}
+      </div>
+
+      <div class="panel">
+        <h3>Kalici Kullanici Ekle</h3>
         <form class="form-row" method="post" action="/portal/user/add">
           <input type="text" name="username" placeholder="Kullanici adi" required>
           <input type="password" name="password" placeholder="Sifre" required>
-          <input type="text" name="full_name" placeholder="Ad Soyad (istege bagli)">
-          <input class="sm" type="number" name="duration_min" placeholder="Dakika" value="60" title="Oturum suresi (dakika)">
+          <input type="text" name="full_name" placeholder="Ad Soyad">
+          <select name="group_name">
+            {% for g in groups %}<option value="{{ g.name }}">{{ g.name }}</option>{% endfor %}
+          </select>
+          <input class="sm" type="number" name="duration_min" value="60" title="Dakika">
           <button class="btn blue" type="submit">Ekle</button>
         </form>
         {% if portal_users %}
         <table style="margin-top:16px;">
-          <thead><tr><th>Kullanici</th><th>Ad Soyad</th><th>Sure</th><th></th></tr></thead>
+          <thead><tr><th>Kullanici</th><th>Ad Soyad</th><th>Grup</th><th>Sure</th><th></th></tr></thead>
           <tbody>
             {% for u in portal_users %}
             <tr>
               <td class="code" style="font-size:14px;">{{ u.username }}</td>
               <td>{{ u.full_name or "-" }}</td>
+              <td><span class="tag grp">{{ u.group_name }}</span></td>
               <td>{{ u.duration_min }} dk</td>
               <td style="text-align:right;">
                 <form method="post" action="/portal/user/delete" style="display:inline;">
@@ -117,19 +144,23 @@
       <div class="panel">
         <h3>Misafir Kodu Uret</h3>
         <form class="form-row" method="post" action="/portal/code/add">
-          <input type="text" name="note" placeholder="Not (orn. Veli toplantisi)">
-          <input class="sm" type="number" name="duration_min" value="120" title="Sure (dakika)">
-          <input class="sm" type="number" name="count" value="1" title="Kac adet">
+          <input type="text" name="note" placeholder="Not">
+          <select name="group_name">
+            {% for g in groups %}<option value="{{ g.name }}" {% if g.name == "misafir" %}selected{% endif %}>{{ g.name }}</option>{% endfor %}
+          </select>
+          <input class="sm" type="number" name="duration_min" value="120" title="Dakika">
+          <input class="sm" type="number" name="count" value="1" title="Adet">
           <button class="btn blue" type="submit">Kod Uret</button>
         </form>
         {% if codes %}
         <table style="margin-top:16px;">
-          <thead><tr><th>Kod</th><th>Not</th><th>Sure</th><th>Durum</th><th></th></tr></thead>
+          <thead><tr><th>Kod</th><th>Not</th><th>Grup</th><th>Sure</th><th>Durum</th><th></th></tr></thead>
           <tbody>
             {% for c in codes %}
             <tr>
               <td class="code">{{ c.code }}</td>
               <td>{{ c.note or "-" }}</td>
+              <td><span class="tag grp">{{ c.group_name }}</span></td>
               <td>{{ c.duration_min }} dk</td>
               <td>{% if c.used %}<span class="tag used">Kullanildi</span>{% else %}<span class="tag free">Bekliyor</span>{% endif %}</td>
               <td style="text-align:right;">
@@ -149,11 +180,12 @@
         <h3>Aktif Oturumlar</h3>
         {% if sessions %}
         <table>
-          <thead><tr><th>Kimlik</th><th>Yontem</th><th>IP</th><th>Baslangic</th><th>Bitis</th><th></th></tr></thead>
+          <thead><tr><th>Kimlik</th><th>Grup</th><th>Yontem</th><th>IP</th><th>Baslangic</th><th>Bitis</th><th></th></tr></thead>
           <tbody>
             {% for s in sessions %}
             <tr>
               <td class="code" style="font-size:14px;">{{ s.identity }}</td>
+              <td><span class="tag grp">{{ s.group_name or "-" }}</span></td>
               <td>{{ s.method }}</td>
               <td style="font-family:monospace;font-size:13px;">{{ s.ip or "-" }}</td>
               <td>{{ s.started }}</td>

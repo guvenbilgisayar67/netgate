@@ -246,6 +246,7 @@ def portal_admin(request: Request):
         "portal_users": portal.list_portal_users(),
         "codes": portal.list_codes(),
         "sessions": portal.list_sessions(active_only=True),
+        "groups": portal.list_groups(),
         "msg": request.query_params.get("msg"),
     })
 
@@ -258,12 +259,11 @@ def portal_toggle(request: Request):
 
 @app.post("/portal/user/add")
 def portal_user_add(request: Request, username: str = Form(...), password: str = Form(...),
-                    full_name: str = Form(""), duration_min: int = Form(60)):
+                    full_name: str = Form(""), group_name: str = Form("ogrenci"), duration_min: int = Form(60)):
     if not is_logged_in(request):
         return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
-    portal.add_portal_user(username, password, full_name, duration_min)
+    portal.add_portal_user(username, password, full_name, group_name, duration_min)
     return RedirectResponse("/portal?msg=user_add", status_code=status.HTTP_303_SEE_OTHER)
-
 @app.post("/portal/user/delete")
 def portal_user_delete(request: Request, uid: int = Form(...)):
     if not is_logged_in(request):
@@ -272,12 +272,11 @@ def portal_user_delete(request: Request, uid: int = Form(...)):
     return RedirectResponse("/portal?msg=user_del", status_code=status.HTTP_303_SEE_OTHER)
 
 @app.post("/portal/code/add")
-def portal_code_add(request: Request, note: str = Form(""), duration_min: int = Form(60), count: int = Form(1)):
+def portal_code_add(request: Request, note: str = Form(""), group_name: str = Form("misafir"), duration_min: int = Form(60), count: int = Form(1)):
     if not is_logged_in(request):
         return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
-    portal.generate_code(note, duration_min, count)
+    portal.generate_code(note, group_name, duration_min, count)
     return RedirectResponse("/portal?msg=code_add", status_code=status.HTTP_303_SEE_OTHER)
-
 @app.post("/portal/code/delete")
 def portal_code_delete(request: Request, cid: int = Form(...)):
     if not is_logged_in(request):
@@ -294,7 +293,18 @@ def portal_session_end(request: Request, sid: int = Form(...)):
 
 # ---------- Captive Portal: Kullanici Giris Ekrani ----------
 # (Gercek makinede, giris yapmamis cihazlar buraya yonlendirilecek)
-
+@app.post("/portal/group/update")
+async def portal_group_update(request: Request):
+    if not is_logged_in(request):
+        return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
+    form = await request.form()
+    name = form.get("name")
+    cats = []
+    for key in ("ads", "adult", "social", "games"):
+        if form.get(f"c_{key}"):
+            cats.append(key)
+    portal.update_group(name, ",".join(cats))
+    return RedirectResponse("/portal?msg=group_upd", status_code=status.HTTP_303_SEE_OTHER)
 @app.get("/hotspot", response_class=HTMLResponse)
 def hotspot_page(request: Request):
     return templates.TemplateResponse(request, "hotspot.html", {"error": None})
