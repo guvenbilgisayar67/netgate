@@ -9,6 +9,21 @@ import json
 
 BASE = pathlib.Path(__file__).parent
 app = FastAPI(title="NetGate")
+
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import RedirectResponse as _RR
+
+class CaptivePortalMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        host = request.headers.get("host", "")
+        # NetGate'in kendi adresleri (panel/hotspot erisimi)
+        own = host.startswith("10.10.0.1") or host.startswith("192.168.1.194") or host.startswith("localhost") or host.startswith("127.0.0.1")
+        # DNAT ile gelen dis site istegi (host bizim degil) -> hotspot'a yonlendir
+        if not own:
+            return _RR(url="http://10.10.0.1:8000/hotspot", status_code=302)
+        return await call_next(request)
+
+app.add_middleware(CaptivePortalMiddleware)
 app.add_middleware(SessionMiddleware, secret_key=secrets.token_hex(32))
 app.mount("/static", StaticFiles(directory=BASE / "static"), name="static")
 templates = Jinja2Templates(directory=BASE / "templates")
@@ -17,6 +32,11 @@ db.init_db()
 users.init_users()
 categories.init_categories()
 portal.init_portal()
+devices.init_devices()
+try:
+    devices.sync_exempt_to_gateway()
+except Exception:
+    pass
 
 def is_logged_in(request: Request) -> bool:
     return request.session.get("user") is not None
@@ -157,7 +177,23 @@ def devices_page(request: Request):
     return templates.TemplateResponse(request, "devices.html", {
         "user": request.session["user"],
         "devices": cihazlar,
+        "exempt": devices.list_exempt(),
+        "msg": request.query_params.get("msg"),
     })
+
+@app.post("/devices/exempt/add")
+def devices_exempt_add(request: Request, mac: str = Form(...), ip: str = Form(""), name: str = Form("")):
+    if not is_logged_in(request):
+        return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
+    devices.add_exempt(mac, ip, name)
+    return RedirectResponse("/devices?msg=exempt_add", status_code=status.HTTP_303_SEE_OTHER)
+
+@app.post("/devices/exempt/remove")
+def devices_exempt_remove(request: Request, dev_id: int = Form(...)):
+    if not is_logged_in(request):
+        return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
+    devices.remove_exempt(dev_id)
+    return RedirectResponse("/devices?msg=exempt_del", status_code=status.HTTP_303_SEE_OTHER)
 
 # ---------- Kullanicilar ----------
 
