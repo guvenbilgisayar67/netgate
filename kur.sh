@@ -73,12 +73,21 @@ table inet netgate {
         iif "lo" accept
         iif "${LAN_IF}" accept
         iif "${WAN_IF}" icmp type echo-request accept
+        iif "${WAN_IF}" tcp dport 8000 accept
+        iif "${WAN_IF}" tcp dport 22 accept
     }
     chain forward {
         type filter hook forward priority 0; policy drop;
         ip saddr @blocked_ips drop
         ct state established,related accept
-        iif "${LAN_IF}" oif "${WAN_IF}" accept
+        iif "${LAN_IF}" ip daddr ${LAN_IP} accept
+        iif "${LAN_IF}" udp dport 53 accept
+        iif "${LAN_IF}" tcp dport 53 accept
+        iif "${LAN_IF}" ether saddr @allowed_macs oif "${WAN_IF}" accept
+    }
+    chain prerouting {
+        type nat hook prerouting priority dstnat; policy accept;
+        iif "${LAN_IF}" ether saddr != @allowed_macs tcp dport 80 dnat ip to ${LAN_IP}:8000
     }
     chain postrouting {
         type nat hook postrouting priority srcnat; policy accept;
