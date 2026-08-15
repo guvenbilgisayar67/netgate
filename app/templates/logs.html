@@ -79,15 +79,17 @@
         {% if logs %}
         <table>
           <thead>
-            <tr><th>Zaman</th><th>Istemci IP</th><th>Alan Adi</th><th>Durum</th></tr>
+            <tr><th>Zaman</th><th>Kullanici</th><th>MAC</th><th>Istemci IP</th><th>Alan Adi</th></tr>
           </thead>
           <tbody>
             {% for r in logs %}
             <tr>
               <td>{{ r.time }}</td>
+              <td>{{ r.user }}</td>
+              <td class="cli" style="font-family:monospace;font-size:12px;">{{ r.mac }}</td>
               <td class="cli">{{ r.client }}</td>
               <td class="dom">{{ r.domain }}</td>
-              <td>
+              <td style="display:none;">
                 {% if r.blocked %}<span class="tag block">Engellendi</span>
                 {% else %}<span class="tag ok">Izin</span>{% endif %}
               </td>
