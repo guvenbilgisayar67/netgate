@@ -3,108 +3,94 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Internet Erisimi - Giris</title>
+  <title>Bahçeşehir Koleji - İnternet Erişimi</title>
   <style>
     * { margin:0; padding:0; box-sizing:border-box; font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
-    body { min-height:100vh; display:flex; align-items:center; justify-content:center; background:linear-gradient(135deg,#1e3a5f,#0f1c2e); padding:20px; }
-    .box { background:#fff; padding:38px 34px; border-radius:16px; box-shadow:0 20px 60px rgba(0,0,0,.4); width:100%; max-width:380px; }
-    .logo { text-align:center; font-size:26px; font-weight:700; color:#1e3a5f; margin-bottom:6px; }
-    .sub { text-align:center; color:#8a97a8; font-size:13px; margin-bottom:24px; }
-    .tabs { display:flex; gap:8px; margin-bottom:20px; }
-    .tabs button { flex:1; padding:10px; border:1px solid #d5dde6; background:#f7f9fb; border-radius:8px; font-size:13px; cursor:pointer; color:#5a6b7f; }
-    .tabs button.active { background:#2b6cb0; color:#fff; border-color:#2b6cb0; }
-    label { display:block; font-size:13px; color:#5a6b7f; margin:12px 0 6px; }
-    input { width:100%; padding:12px; border:1px solid #d5dde6; border-radius:8px; font-size:14px; }
-    input:focus { outline:none; border-color:#2b6cb0; }
-    input.code-in { text-align:center; font-size:22px; letter-spacing:4px; font-family:monospace; text-transform:uppercase; }
-    button.submit { width:100%; margin-top:20px; padding:13px; background:#2b6cb0; color:#fff; border:none; border-radius:8px; font-size:15px; font-weight:600; cursor:pointer; }
-    button.submit:hover { background:#245a94; }
-    .err { background:#fde8e8; color:#c0392b; padding:11px; border-radius:8px; font-size:13px; margin-bottom:16px; text-align:center; }
-    .ok { background:#e6f6ec; color:#1e7e45; padding:16px; border-radius:8px; font-size:14px; text-align:center; }
-    .ok .big { font-size:18px; font-weight:700; margin-bottom:6px; }
+    body { background:#e2001a; min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px; }
+    .wrap { width:100%; max-width:390px; }
+    .logo-box { text-align:center; margin-bottom:24px; }
+    .logo-box img { max-width:260px; width:100%; height:auto; }
+    .card { background:#fff; border-radius:18px; padding:28px 24px; box-shadow:0 10px 40px rgba(0,0,0,.2); }
+    .card h2 { font-size:20px; color:#1a1a1a; text-align:center; font-weight:600; }
+    .card .sub { font-size:13px; color:#777; text-align:center; margin:5px 0 22px; }
+    .tabs { display:flex; background:#f2f2f2; border-radius:11px; padding:4px; margin-bottom:22px; }
+    .tab { flex:1; text-align:center; padding:10px; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer; color:#777; border:none; background:none; }
+    .tab.active { background:#e2001a; color:#fff; }
+    label { display:block; font-size:13px; color:#444; margin-bottom:6px; font-weight:500; }
+    .inbox { display:flex; align-items:center; border:1.5px solid #ddd; border-radius:11px; padding:0 12px; margin-bottom:16px; transition:border .2s; }
+    .inbox:focus-within { border-color:#e2001a; }
+    .inbox input { border:none; outline:none; padding:13px 8px; font-size:15px; flex:1; background:transparent; }
+    .btn { width:100%; padding:15px; background:#e2001a; color:#fff; border:none; border-radius:11px; font-size:16px; font-weight:600; cursor:pointer; margin-top:6px; }
+    .btn:active { transform:scale(.99); }
     .hidden { display:none; }
-    .foot { text-align:center; margin-top:18px; font-size:12px; color:#b0bcc9; }
+    .err { background:#fde8e8; color:#c0392b; padding:11px 14px; border-radius:9px; font-size:14px; margin-bottom:16px; text-align:center; }
+    .ok { background:#e6f6ec; color:#1e7e45; padding:16px; border-radius:11px; font-size:15px; text-align:center; }
+    .foot { text-align:center; margin-top:20px; font-size:12px; color:rgba(255,255,255,.75); }
     .limit-box { text-align:center; }
-    .dev-item { border:1px solid #e2e8ef; border-radius:10px; padding:12px; margin-bottom:10px; text-align:left; }
-    .pw-sm { margin-bottom:8px; }
-    .btn-close { width:100%; padding:10px; background:#c0392b; color:#fff; border:none; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer; }
+    .dev-item { border:1px solid #e2e8ef; border-radius:11px; padding:13px; margin-bottom:11px; text-align:left; }
+    .pw-sm { width:100%; padding:10px; border:1.5px solid #ddd; border-radius:9px; margin:8px 0; font-size:14px; }
+    .btn-close { width:100%; padding:11px; background:#e2001a; color:#fff; border:none; border-radius:9px; font-size:14px; font-weight:600; cursor:pointer; }
   </style>
 </head>
 <body>
-  <div class="box">
-    <div class="logo">Internet Erisimi</div>
-    <div class="sub">Baglanmak icin giris yapin</div>
-
-    {% if success %}
-      <div class="ok">
-        <div class="big">Baglandiniz!</div>
-        {{ success }}<br>Artik internete erisebilirsiniz.
-      </div>
-    {% else %}
+  <div class="wrap">
+    <div class="logo-box">
+      <img src="/static/logo.jpg" alt="Bahçeşehir Koleji">
+    </div>
+    <div class="card">
+      {% if success %}
+      <div class="ok"><b>{{ success }}</b><br>Artık internete erişebilirsiniz.</div>
+      {% else %}
       {% if limit_reached %}
       <div class="limit-box">
-        <h3 style="color:#c0392b;margin-bottom:8px;">Cihaz Limitine Ulastiniz</h3>
-        <p style="font-size:14px;color:#5a6b7f;margin-bottom:16px;">Bu hesap en fazla <b>{{ limit }}</b> cihazda kullanilabilir. Yeni cihazda baglanmak icin asagidaki acik oturumlardan birini kapatin (sifrenizi girerek).</p>
-        <div style="margin-bottom:14px;">
-          {% for d in active_devices %}
-          <div class="dev-item">
-            <div>
-              <div style="font-size:14px;font-weight:700;color:#1e3a5f;">{{ d.name or "Bilinmeyen cihaz" }}</div>
-              <div style="font-family:monospace;font-size:12px;color:#5a6b7f;">{{ d.mac }}</div>
-              <div style="font-size:11px;color:#8a97a8;">IP: {{ d.ip }} &middot; {{ d.started }}</div>
-            </div>
-            <form method="post" action="/hotspot/close-session" style="margin:0;">
-              <input type="hidden" name="identity" value="{{ identity }}">
-              <input type="hidden" name="session_id" value="{{ d.id }}">
-              <input type="password" name="secret" placeholder="Sifreniz" required class="pw-sm">
-              <button type="submit" class="btn-close">Bu cihazi kapat ve baglan</button>
-            </form>
-          </div>
-          {% endfor %}
+        <h2 style="color:#c0392b;">Cihaz Limiti Doldu</h2>
+        <p style="font-size:13px;color:#777;margin:8px 0 18px;">Bu hesap en fazla <b>{{ limit }}</b> cihazda kullanilabilir. Baglanmak icin bir oturumu kapatin (sifrenizle).</p>
+        {% for d in active_devices %}
+        <div class="dev-item">
+          <div style="font-weight:600;color:#1e3a5f;">{{ d.name or "Bilinmeyen cihaz" }}</div>
+          <div style="font-family:monospace;font-size:12px;color:#5a6b7f;">{{ d.mac }}</div>
+          <div style="font-size:11px;color:#8a97a8;">IP: {{ d.ip }} · {{ d.started }}</div>
+          <form method="post" action="/hotspot/close-session" style="margin-top:8px;">
+            <input type="hidden" name="identity" value="{{ identity }}">
+            <input type="hidden" name="session_id" value="{{ d.id }}">
+            <input type="password" name="secret" placeholder="Sifreniz" required class="pw-sm">
+            <button type="submit" class="btn-close">Bu cihazi kapat ve baglan</button>
+          </form>
         </div>
-        <a href="/hotspot" style="font-size:13px;color:#2b6cb0;">Vazgec / Geri don</a>
+        {% endfor %}
+        <a href="/hotspot" style="font-size:13px;color:#e2001a;">Geri don</a>
       </div>
       {% else %}
+      <h2>İnternet Erişimi</h2>
+      <div class="sub">Bağlanmak için giriş yapın</div>
       {% if error %}<div class="err">{{ error }}</div>{% endif %}
-
       <div class="tabs">
-        <button type="button" id="tab-account" class="active" onclick="showTab('account')">Hesap</button>
-        <button type="button" id="tab-code" onclick="showTab('code')">Misafir Kodu</button>
+        <button class="tab active" id="tab-acc" onclick="showTab('account')">Hesap</button>
+        <button class="tab" id="tab-code" onclick="showTab('code')">Misafir Kodu</button>
       </div>
-
       <form method="post" action="/hotspot" id="form-account">
-        <label>Kullanici Adi</label>
-        <input type="text" name="identity" autocomplete="username">
-        <label>Sifre</label>
-        <input type="password" name="secret" autocomplete="current-password">
-        <button class="submit" type="submit">Giris Yap</button>
+        <label>Kullanıcı Adı</label>
+        <div class="inbox"><input type="text" name="identity" placeholder="kullanıcı adınız"></div>
+        <label>Şifre</label>
+        <div class="inbox"><input type="password" name="secret" placeholder="••••••"></div>
+        <button class="btn" type="submit">Giriş Yap</button>
       </form>
-
       <form method="post" action="/hotspot" id="form-code" class="hidden">
-        <input type="hidden" name="identity" value="">
-        <label>Size verilen 6 haneli kod</label>
-        <input class="code-in" type="text" name="secret" maxlength="6" placeholder="ABC123">
-        <button class="submit" type="submit">Baglan</button>
+        <label>Misafir Kodu</label>
+        <div class="inbox"><input type="text" name="secret" placeholder="6 haneli kod"></div>
+        <button class="btn" type="submit">Giriş Yap</button>
       </form>
-    {% endif %}
-    {% endif %}
-
-    <div class="foot">NetGate</div>
+      {% endif %}
+      {% endif %}
+    </div>
+    <div class="foot">NetGate · Güvenli Ağ Erişimi</div>
   </div>
-
   <script>
-    function showTab(which) {
-      var acc = document.getElementById('form-account');
-      var cod = document.getElementById('form-code');
-      var ta = document.getElementById('tab-account');
-      var tc = document.getElementById('tab-code');
-      if (which === 'account') {
-        acc.classList.remove('hidden'); cod.classList.add('hidden');
-        ta.classList.add('active'); tc.classList.remove('active');
-      } else {
-        cod.classList.remove('hidden'); acc.classList.add('hidden');
-        tc.classList.add('active'); ta.classList.remove('active');
-      }
+    function showTab(t){
+      document.getElementById('form-account').classList.toggle('hidden', t!=='account');
+      document.getElementById('form-code').classList.toggle('hidden', t!=='code');
+      document.getElementById('tab-acc').classList.toggle('active', t==='account');
+      document.getElementById('tab-code').classList.toggle('active', t==='code');
     }
   </script>
 </body>
