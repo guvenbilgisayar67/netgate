@@ -90,7 +90,7 @@ def apply_blocklist():
         return False
     # dnsmasq'i yeniden yukle (systemctl reload)
     try:
-        subprocess.run(["sudo", "systemctl", "reload", "dnsmasq"], check=False)
+        subprocess.run(["sudo", "systemctl", "restart", "dnsmasq"], check=False)
     except Exception:
         pass
     return True

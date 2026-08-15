@@ -137,6 +137,6 @@ def disable_category(key):
 
 def _reload_dnsmasq():
     try:
-        subprocess.run(["sudo", "systemctl", "reload", "dnsmasq"], check=False, timeout=10)
+        subprocess.run(["sudo", "systemctl", "restart", "dnsmasq"], check=False, timeout=10)
     except Exception:
         pass
