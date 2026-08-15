@@ -110,14 +110,14 @@ def create_group(name, bandwidth_kbps=0, duration_min=60, categories="", descrip
     conn.close()
     return ok, msg
 
-def update_group(name, categories, bandwidth_kbps, duration_min=None):
+def update_group(name, categories, bandwidth_kbps, duration_min=None, max_devices=None):
     conn = get_conn()
-    if duration_min is None:
-        conn.execute("UPDATE portal_groups SET categories=?, bandwidth_kbps=? WHERE name=?",
-                     (categories, int(bandwidth_kbps), name))
-    else:
-        conn.execute("UPDATE portal_groups SET categories=?, bandwidth_kbps=?, duration_min=? WHERE name=?",
-                     (categories, int(bandwidth_kbps), int(duration_min), name))
+    conn.execute("UPDATE portal_groups SET categories=?, bandwidth_kbps=? WHERE name=?",
+                 (categories, int(bandwidth_kbps), name))
+    if duration_min is not None:
+        conn.execute("UPDATE portal_groups SET duration_min=? WHERE name=?", (int(duration_min), name))
+    if max_devices is not None:
+        conn.execute("UPDATE portal_groups SET max_devices=? WHERE name=?", (int(max_devices), name))
     conn.commit()
     conn.close()
 
@@ -138,14 +138,14 @@ def list_portal_users():
     conn.close()
     return rows
 
-def add_portal_user(username, password, full_name, group_name, duration_min, bandwidth_kbps=0):
+def add_portal_user(username, password, full_name, group_name, duration_min, bandwidth_kbps=0, max_devices=0):
     username = username.strip()
     if not username or not password:
         return False, "Kullanici adi ve sifre gerekli"
     conn = get_conn()
     try:
-        conn.execute("INSERT INTO portal_users (username, password_hash, full_name, group_name, duration_min, bandwidth_kbps, enabled, created) VALUES (?, ?, ?, ?, ?, ?, 1, ?)",
-                     (username, _hash(password), full_name.strip(), group_name, int(duration_min), int(bandwidth_kbps), datetime.now().strftime("%Y-%m-%d %H:%M")))
+        conn.execute("INSERT INTO portal_users (username, password_hash, full_name, group_name, duration_min, bandwidth_kbps, max_devices, enabled, created) VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)",
+                     (username, _hash(password), full_name.strip(), group_name, int(duration_min), int(bandwidth_kbps), int(max_devices), datetime.now().strftime("%Y-%m-%d %H:%M")))
         conn.commit()
         ok, msg = True, "Kullanici eklendi"
     except sqlite3.IntegrityError:
@@ -192,6 +192,52 @@ def _effective_bw(user_bw, group_name):
     g = get_group(group_name)
     return g["bandwidth_kbps"] if g else 0
 
+
+def _effective_max_devices(user_max, group_name):
+    """Kisi limiti 0 ise grup limitini kullan."""
+    if user_max and user_max > 0:
+        return user_max
+    g = get_group(group_name)
+    return g["max_devices"] if g and "max_devices" in g.keys() else 1
+
+def _device_name(mac):
+    """DHCP lease dosyasindan MAC'in cihaz ismini bulur."""
+    if not mac:
+        return ""
+    try:
+        with open("/var/lib/misc/dnsmasq.leases") as f:
+            for line in f:
+                parts = line.split()
+                if len(parts) >= 4 and parts[1].lower() == mac.lower():
+                    name = parts[3]
+                    return name if name != "*" else ""
+    except Exception:
+        pass
+    return ""
+
+def active_sessions_for(identity):
+    """Bir kullanicinin aktif oturumlarini dondurur (ayni identity)."""
+    conn = get_conn()
+    rows = conn.execute("SELECT * FROM portal_sessions WHERE identity=? AND active=1 ORDER BY started", (identity,)).fetchall()
+    conn.close()
+    return rows
+
+def close_session_with_password(session_id, identity, password):
+    """Kullanici sifresiyle kendi oturumunu kapatir."""
+    conn = get_conn()
+    u = conn.execute("SELECT * FROM portal_users WHERE username=? AND enabled=1", (identity,)).fetchone()
+    conn.close()
+    if not u or not _verify(password, u["password_hash"]):
+        return False, "Sifre hatali"
+    # Oturum bu kullaniciya mi ait?
+    conn = get_conn()
+    s = conn.execute("SELECT * FROM portal_sessions WHERE id=? AND identity=? AND active=1", (session_id, identity)).fetchone()
+    conn.close()
+    if not s:
+        return False, "Oturum bulunamadi"
+    end_session(session_id)
+    return True, "Oturum kapatildi"
+
 def portal_login(identity, secret, ip="", mac=""):
     conn = get_conn()
     duration = method = ident = group = None
@@ -208,10 +254,22 @@ def portal_login(identity, secret, ip="", mac=""):
         u = conn.execute("SELECT * FROM portal_users WHERE username=? AND enabled=1", (identity.strip(),)).fetchone()
         if u and _verify(secret, u["password_hash"]):
             duration, method, ident, group, bw = u["duration_min"], "hesap", u["username"], u["group_name"], u["bandwidth_kbps"]
+            user_max = u["max_devices"] if "max_devices" in u.keys() else 0
         else:
             conn.close()
             return False, "Kullanici adi/sifre veya kod hatali"
     conn.close()
+    # --- Cihaz limiti kontrolu (sadece hesap girisinde) ---
+    if method == "hesap":
+        umax = user_max if 'user_max' in dir() else 0
+        limit = _effective_max_devices(umax, group)
+        actives = active_sessions_for(ident)
+        # Bu cihaz (MAC) zaten acik mi? Ayni cihaz tekrar giriyorsa sorun yok
+        this_mac_active = any(s["mac"] and mac and s["mac"].lower() == mac.lower() for s in actives)
+        if not this_mac_active and len(actives) >= limit:
+            # Limit dolu - aktif oturumlari isaretle dondur
+            dev_list = "|".join(f"{s['id']},{s['mac'] or '?'},{s['ip'] or '?'},{s['started']},{_device_name(s['mac']) or 'Bilinmeyen cihaz'}" for s in actives)
+            return "LIMIT", f"{ident}||{limit}||{dev_list}"
     eff_bw = _effective_bw(bw, group)
     now = datetime.now()
     expires = now + timedelta(minutes=duration)

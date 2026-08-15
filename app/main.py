@@ -325,10 +325,10 @@ def portal_toggle(request: Request):
 @app.post("/portal/user/add")
 def portal_user_add(request: Request, username: str = Form(...), password: str = Form(...),
                     full_name: str = Form(""), group_name: str = Form("ogrenci"),
-                    duration_min: int = Form(60), bandwidth_kbps: int = Form(0)):
+                    duration_min: int = Form(60), bandwidth_kbps: int = Form(0), max_devices: int = Form(0)):
     if not is_logged_in(request):
         return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
-    portal.add_portal_user(username, password, full_name, group_name, duration_min, bandwidth_kbps)
+    portal.add_portal_user(username, password, full_name, group_name, duration_min, bandwidth_kbps, max_devices)
     return RedirectResponse("/portal?msg=user_add", status_code=status.HTTP_303_SEE_OTHER)
 @app.post("/portal/user/delete")
 def portal_user_delete(request: Request, uid: int = Form(...)):
@@ -374,7 +374,12 @@ async def portal_group_update(request: Request):
         bw = int(bw)
     except ValueError:
         bw = 0
-    portal.update_group(name, ",".join(cats), bw)
+    md = form.get("max_devices", "1")
+    try:
+        md = int(md)
+    except ValueError:
+        md = 1
+    portal.update_group(name, ",".join(cats), bw, max_devices=md)
     return RedirectResponse("/portal?msg=group_upd", status_code=status.HTTP_303_SEE_OTHER)
 
 @app.post("/portal/group/create")
@@ -398,7 +403,42 @@ def hotspot_page(request: Request):
 @app.post("/hotspot")
 def hotspot_login(request: Request, identity: str = Form(""), secret: str = Form(...)):
     client_ip = request.client.host if request.client else ""
-    ok, msg = portal.portal_login(identity, secret, ip=client_ip, mac="")
-    if ok:
+    try:
+        from app import gateway
+        real_mac = gateway.mac_from_ip(client_ip)
+    except Exception:
+        real_mac = ""
+    result, msg = portal.portal_login(identity, secret, ip=client_ip, mac=real_mac)
+    if result == "LIMIT":
+        parts = msg.split("||")
+        ident = parts[0]
+        limit = parts[1] if len(parts) > 1 else "1"
+        devices_raw = parts[2] if len(parts) > 2 else ""
+        dev_list = []
+        for d in devices_raw.split("|"):
+            if not d:
+                continue
+            f = d.split(",")
+            if len(f) >= 4:
+                dev_list.append({"id": f[0], "mac": f[1], "ip": f[2], "started": f[3], "name": f[4] if len(f) > 4 else ""})
+        return templates.TemplateResponse(request, "hotspot.html", {
+            "error": None, "limit_reached": True, "identity": ident,
+            "limit": limit, "active_devices": dev_list})
+    if result is True:
         return templates.TemplateResponse(request, "hotspot.html", {"error": None, "success": msg})
     return templates.TemplateResponse(request, "hotspot.html", {"error": msg})
+
+@app.post("/hotspot/close-session")
+def hotspot_close_session(request: Request, identity: str = Form(...), secret: str = Form(...), session_id: int = Form(...)):
+    ok, msg = portal.close_session_with_password(session_id, identity, secret)
+    if ok:
+        client_ip = request.client.host if request.client else ""
+        try:
+            from app import gateway
+            real_mac = gateway.mac_from_ip(client_ip)
+        except Exception:
+            real_mac = ""
+        result, lmsg = portal.portal_login(identity, secret, ip=client_ip, mac=real_mac)
+        if result is True:
+            return templates.TemplateResponse(request, "hotspot.html", {"error": None, "success": lmsg})
+    return templates.TemplateResponse(request, "hotspot.html", {"error": msg or "Islem basarisiz"})

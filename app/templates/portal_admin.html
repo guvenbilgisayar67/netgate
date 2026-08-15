@@ -116,6 +116,7 @@
             <label class="chk"><input type="checkbox" name="c_social" {% if "social" in cats %}checked{% endif %}> Sosyal Medya</label>
             <label class="chk"><input type="checkbox" name="c_games" {% if "games" in cats %}checked{% endif %}> Oyun</label>
             <span class="bwbox">Hiz (kbps): <input type="number" name="bandwidth_kbps" value="{{ g.bandwidth_kbps }}"></span>
+            <span class="bwbox">Cihaz limiti: <input type="number" name="max_devices" value="{{ g.max_devices }}" min="1" style="width:60px;"></span>
             <button class="btn blue" type="submit" style="margin-left:10px;padding:7px 16px;font-size:13px;">Kaydet</button>
           </form>
           <form method="post" action="/portal/group/delete" style="display:inline;margin-left:6px;">
@@ -128,18 +129,20 @@
 
       <div class="panel">
         <h3>Kalici Kullanici Ekle</h3>
-        <form class="form-row" method="post" action="/portal/user/add">
-          <input type="text" name="username" placeholder="Kullanici adi" required>
-          <input type="password" name="password" placeholder="Sifre" required>
-          <input type="text" name="full_name" placeholder="Ad Soyad">
+        <form class="form-row" method="post" action="/portal/user/add" style="align-items:flex-end;">
+          <div style="display:flex;flex-direction:column;"><label>Kullanici Adi</label><input type="text" name="username" placeholder="Kullanici adi" required></div>
+          <div style="display:flex;flex-direction:column;"><label>Sifre</label><input type="password" name="password" placeholder="Sifre" required></div>
+          <div style="display:flex;flex-direction:column;"><label>Ad Soyad</label><input type="text" name="full_name" placeholder="Ad Soyad"></div>
+          <div style="display:flex;flex-direction:column;"><label>Grup</label>
           <select name="group_name">
             {% for g in groups %}<option value="{{ g.name }}">{{ g.name }}</option>{% endfor %}
-          </select>
-          <input class="sm" type="number" name="duration_min" value="60" title="Dakika">
-          <input class="sm" type="number" name="bandwidth_kbps" value="0" title="Kisiye ozel hiz (kbps, 0=grup varsayilani)">
+          </select></div>
+          <div style="display:flex;flex-direction:column;"><label>Sure (dk)</label><input class="sm" type="number" name="duration_min" value="60"></div>
+          <div style="display:flex;flex-direction:column;"><label>Hiz (kbps)</label><input class="sm" type="number" name="bandwidth_kbps" value="0" title="0=grup varsayilani"></div>
+          <div style="display:flex;flex-direction:column;"><label>Cihaz limiti</label><input class="sm" type="number" name="max_devices" value="0" title="0=grup varsayilani"></div>
           <button class="btn blue" type="submit">Ekle</button>
         </form>
-        <div class="muted" style="margin-top:8px;">Hiz alani 0 birakilirsa grup varsayilani kullanilir. Deger girilirse o kullaniciya ozel olur.</div>
+        <div class="muted" style="margin-top:8px;">Hiz ve Cihaz limiti alanlari 0 birakilirsa o kullanicinin grubunun varsayilani kullanilir. Deger girerseniz o kisiye ozel olur. (Hiz kbps: 50000=50Mbps, Cihaz limiti: kac cihazda ayni anda acik olabilecegi)</div>
         {% if portal_users %}
         <table style="margin-top:16px;">
           <thead><tr><th>Kullanici</th><th>Ad Soyad</th><th>Grup</th><th>Sure</th><th>Hiz</th><th></th></tr></thead>
