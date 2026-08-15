@@ -4,7 +4,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 import secrets, pathlib
-from app import db, logs, devices, users, settings, categories, portal
+from app import db, logs, devices, users, settings, categories, portal, reports
 import json
 
 BASE = pathlib.Path(__file__).parent
@@ -167,6 +167,27 @@ def blocklist_delete(request: Request, domain_id: int = Form(...)):
     return RedirectResponse("/blocklist?msg=silindi", status_code=status.HTTP_303_SEE_OTHER)
 
 # ---------- Loglar ----------
+
+
+@app.get("/reports", response_class=HTMLResponse)
+def reports_page(request: Request):
+    if not is_logged_in(request):
+        return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
+    from datetime import date as _date
+    _today = _date.today().strftime("%Y-%m-%d")
+    q = request.query_params.get("q", "")
+    date_from = request.query_params.get("from", "") or _today
+    date_to = request.query_params.get("to", "") or _today
+    result = {"users": [], "details": []}
+    if q or date_from or date_to:
+        result = reports.search_user_activity(q, date_from, date_to)
+    return templates.TemplateResponse(request, "reports.html", {
+        "user": request.session["user"],
+        "q": q, "date_from": date_from or "", "date_to": date_to or "",
+        "users": result["users"], "details": result["details"],
+        "searched": bool(q or date_from or date_to),
+    })
+
 
 @app.get("/logs", response_class=HTMLResponse)
 def logs_page(request: Request):

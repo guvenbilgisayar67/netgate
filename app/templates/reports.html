@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NetGate - Kullanici Raporlari</title>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
+    body { background:#eef2f6; color:#243447; }
+    .topbar { background:#1e3a5f; color:#fff; padding:0 24px; height:60px; display:flex; align-items:center; justify-content:space-between; }
+    .topbar .brand { font-size:19px; font-weight:700; }
+    .topbar a { color:#cfe0f0; text-decoration:none; font-size:14px; }
+    .layout { display:flex; min-height:calc(100vh - 60px); }
+    .side { width:220px; background:#fff; border-right:1px solid #e2e8ef; padding:18px 0; }
+    .side a { display:block; padding:12px 24px; color:#4a5b6e; text-decoration:none; font-size:14px; border-left:3px solid transparent; }
+    .side a:hover { background:#f4f7fa; border-left-color:#2b6cb0; color:#1e3a5f; }
+    .side a.active { background:#eef5fc; border-left-color:#2b6cb0; color:#1e3a5f; font-weight:600; }
+    .main { flex:1; padding:28px; }
+    .h1 { font-size:22px; margin-bottom:4px; }
+    .muted { color:#8a97a8; font-size:14px; margin-bottom:22px; }
+    .panel { background:#fff; border-radius:12px; padding:22px; box-shadow:0 2px 8px rgba(0,0,0,.04); margin-bottom:22px; }
+    .panel h3 { font-size:15px; color:#1e3a5f; margin-bottom:16px; }
+    .filter-row { display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end; }
+    .fld { display:flex; flex-direction:column; }
+    .fld label { font-size:13px; color:#6b7a8d; margin-bottom:5px; }
+    .fld input { padding:10px 12px; border:1px solid #d5dde6; border-radius:8px; font-size:14px; }
+    .fld input.wide { width:260px; }
+    .btn { padding:11px 22px; background:#2b6cb0; color:#fff; border:none; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer; }
+    table { width:100%; border-collapse:collapse; }
+    th { text-align:left; font-size:12px; text-transform:uppercase; letter-spacing:.5px; color:#8a97a8; padding:10px 12px; border-bottom:2px solid #eef2f6; }
+    td { padding:11px 12px; border-bottom:1px solid #f4f7fa; font-size:14px; vertical-align:top; }
+    .mac { font-family:monospace; font-size:12px; color:#5a6b7f; }
+    .num { font-weight:600; color:#1e3a5f; }
+    .site-tag { display:inline-block; background:#eef5fc; color:#2b6cb0; padding:2px 8px; border-radius:12px; font-size:12px; margin:2px 3px 2px 0; }
+    .empty { text-align:center; color:#8a97a8; padding:30px; font-size:14px; }
+    details summary { cursor:pointer; color:#2b6cb0; font-size:13px; }
+    .stat { display:inline-block; background:#f4f7fa; padding:8px 14px; border-radius:8px; margin-right:10px; font-size:13px; }
+    .stat b { color:#1e3a5f; font-size:16px; }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand">NetGate</div>
+    <div><span style="margin-right:16px;font-size:14px;">{{ user }}</span><a href="/logout">Cikis</a></div>
+  </div>
+  <div class="layout">
+    <nav class="side">
+      <a href="/">Genel Bakis</a>
+      <a href="/devices">Cihazlar</a>
+      <a href="/blocklist">Site Engelleme</a>
+      <a href="/categories">Kategoriler</a>
+      <a href="/portal">Captive Portal</a>
+      <a href="/reports" class="active">Kullanici Raporlari</a>
+      <a href="/logs">Loglar</a>
+      <a href="/users">Kullanicilar</a>
+      <a href="/settings">Ayarlar</a>
+    </nav>
+    <div class="main">
+      <div class="h1">Kullanici Raporlari</div>
+      <div class="muted">Isim, kullanici adi veya cihaz (MAC) ile arayin, tarih araligi verin</div>
+
+      <div class="panel">
+        <form class="filter-row" method="get" action="/reports">
+          <div class="fld">
+            <label>Ara (isim / kullanici adi / cihaz)</label>
+            <input class="wide" type="text" name="q" value="{{ q }}" placeholder="orn. Ahmet Yilmaz, ahmet, ya da MAC">
+          </div>
+          <div class="fld">
+            <label>Baslangic tarihi</label>
+            <input type="date" name="from" value="{{ date_from }}">
+          </div>
+          <div class="fld">
+            <label>Bitis tarihi</label>
+            <input type="date" name="to" value="{{ date_to }}">
+          </div>
+          <button class="btn" type="submit">Ara</button>
+        </form>
+      </div>
+
+      {% if searched %}
+        {% if users %}
+        <div class="panel">
+          <h3>Kullanici Ozetleri ({{ users|length }} kullanici)</h3>
+          <table>
+            <thead><tr><th>Kullanici</th><th>Ad Soyad</th><th>Cihaz(lar)</th><th>Toplam Erisim</th><th>Farkli Site</th><th>Ilk</th><th>Son</th></tr></thead>
+            <tbody>
+              {% for u in users %}
+              <tr>
+                <td><b>{{ u.user }}</b></td>
+                <td>{{ u.fullname or "-" }}</td>
+                <td class="mac">{{ u.macs }}</td>
+                <td class="num">{{ u.total }}</td>
+                <td class="num">{{ u.unique_sites }}</td>
+                <td style="font-size:13px;color:#8a97a8;">{{ u.first }}</td>
+                <td style="font-size:13px;color:#8a97a8;">{{ u.last }}</td>
+              </tr>
+              <tr>
+                <td colspan="7" style="padding-top:0;">
+                  <details>
+                    <summary>En cok girdigi siteler</summary>
+                    <div style="padding:10px 0;">
+                      {% for site, cnt in u.top_sites %}
+                      <span class="site-tag">{{ site }} <b>({{ cnt }})</b></span>
+                      {% endfor %}
+                    </div>
+                  </details>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <div class="panel">
+          <h3>Detayli Hareketler (son {{ details|length }} kayit)</h3>
+          <table>
+            <thead><tr><th>Zaman</th><th>Kullanici</th><th>Cihaz (MAC)</th><th>Site</th></tr></thead>
+            <tbody>
+              {% for d in details %}
+              <tr>
+                <td style="font-size:13px;">{{ d.time }}</td>
+                <td>{{ d.user }}{% if d.fullname %} <span style="color:#8a97a8;">({{ d.fullname }})</span>{% endif %}</td>
+                <td class="mac">{{ d.mac }}</td>
+                <td class="dom">{{ d.domain }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="panel"><div class="empty">Bu aramaya uygun kayit bulunamadi.</div></div>
+        {% endif %}
+      {% else %}
+      <div class="panel"><div class="empty">Aramak icin yukaridan bir isim/kullanici girin veya tarih secin.</div></div>
+      {% endif %}
+    </div>
+  </div>
+</body>
+</html>
