@@ -1,10 +1,10 @@
 from fastapi import FastAPI, Request, Form, status
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 import secrets, pathlib
-from app import db, logs, devices, users, settings, categories, portal, reports
+from app import db, logs, devices, users, settings, categories, portal, reports, netinfo
 import json
 
 BASE = pathlib.Path(__file__).parent
@@ -167,6 +167,23 @@ def blocklist_delete(request: Request, domain_id: int = Form(...)):
     return RedirectResponse("/blocklist?msg=silindi", status_code=status.HTTP_303_SEE_OTHER)
 
 # ---------- Loglar ----------
+
+
+
+@app.get("/netinfo", response_class=HTMLResponse)
+def netinfo_page(request: Request):
+    if not is_logged_in(request):
+        return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
+    info = netinfo.get_network_info()
+    return templates.TemplateResponse(request, "netinfo.html", {
+        "user": request.session["user"], "info": info,
+    })
+
+@app.get("/api/traffic")
+def api_traffic(request: Request):
+    if not is_logged_in(request):
+        return JSONResponse({"error": "auth"}, status_code=401)
+    return JSONResponse(netinfo.get_traffic_counters())
 
 
 @app.get("/reports", response_class=HTMLResponse)
