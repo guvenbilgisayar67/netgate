@@ -95,6 +95,34 @@
         <div class="empty">Henuz engellenen site yok. Yukaridan ekleyebilirsiniz.</div>
         {% endif %}
       </div>
+
+      <div class="panel">
+        <h3>Izin Verilen Siteler (Istisna)</h3>
+        <div class="muted" style="margin-bottom:14px;">Buraya eklenen siteler, hangi kategoride olursa olsun ASLA engellenmez. Yanlislikla engellenen kendi sitelerinizi buraya ekleyin.</div>
+        <form class="form-row" method="post" action="/whitelist/add">
+          <input type="text" name="domain" placeholder="ornek: okulumuz.com" required style="flex:1;">
+          <button class="btn green" type="submit">Istisna Ekle</button>
+        </form>
+        {% if whitelist %}
+        <table style="margin-top:16px;">
+          <thead><tr><th>Domain</th><th>Eklendi</th><th></th></tr></thead>
+          <tbody>
+            {% for w in whitelist %}
+            <tr>
+              <td style="font-weight:600;color:#1e7e45;">{{ w.domain }}</td>
+              <td style="color:#8a97a8;font-size:13px;">{{ w.added }}</td>
+              <td style="text-align:right;">
+                <form method="post" action="/whitelist/delete" style="display:inline;">
+                  <input type="hidden" name="wid" value="{{ w.id }}">
+                  <button class="del" type="submit">Kaldir</button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}<div class="empty" style="margin-top:12px;">Henuz istisna site yok.</div>{% endif %}
+      </div>
     </div>
   </div>
 </body>

@@ -5,54 +5,62 @@ from datetime import datetime, timedelta
 from app.db import get_conn
 import bcrypt
 
+# ---------- Kurulum ----------
+
 def init_portal():
     conn = get_conn()
     conn.execute("""
         CREATE TABLE IF NOT EXISTS portal_settings (
-            key TEXT PRIMARY KEY, value TEXT
+            key   TEXT PRIMARY KEY,
+            value TEXT
         )
     """)
     conn.execute("""
         CREATE TABLE IF NOT EXISTS portal_users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT UNIQUE NOT NULL,
-            password_hash TEXT NOT NULL,
-            full_name TEXT,
-            group_name TEXT NOT NULL DEFAULT 'ogrenci',
-            duration_min INTEGER NOT NULL DEFAULT 60,
+            id             INTEGER PRIMARY KEY AUTOINCREMENT,
+            username       TEXT UNIQUE NOT NULL,
+            password_hash  TEXT NOT NULL,
+            full_name      TEXT,
+            group_name     TEXT NOT NULL DEFAULT 'ogrenci',
+            duration_min   INTEGER NOT NULL DEFAULT 60,
             bandwidth_kbps INTEGER NOT NULL DEFAULT 0,
-            enabled INTEGER NOT NULL DEFAULT 1,
-            created TEXT NOT NULL
+            enabled        INTEGER NOT NULL DEFAULT 1,
+            created        TEXT NOT NULL
         )
     """)
     conn.execute("""
         CREATE TABLE IF NOT EXISTS portal_groups (
-            name TEXT PRIMARY KEY,
-            categories TEXT,
+            name           TEXT PRIMARY KEY,
+            categories     TEXT,
             bandwidth_kbps INTEGER NOT NULL DEFAULT 0,
-            duration_min INTEGER NOT NULL DEFAULT 60,
-            description TEXT
+            description    TEXT
         )
     """)
     conn.execute("""
         CREATE TABLE IF NOT EXISTS portal_codes (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            code TEXT UNIQUE NOT NULL,
-            note TEXT,
-            group_name TEXT NOT NULL DEFAULT 'misafir',
+            id           INTEGER PRIMARY KEY AUTOINCREMENT,
+            code         TEXT UNIQUE NOT NULL,
+            note         TEXT,
+            group_name   TEXT NOT NULL DEFAULT 'misafir',
             duration_min INTEGER NOT NULL DEFAULT 60,
-            used INTEGER NOT NULL DEFAULT 0,
-            used_by_ip TEXT, used_at TEXT, created TEXT NOT NULL
+            used         INTEGER NOT NULL DEFAULT 0,
+            used_by_ip   TEXT,
+            used_at      TEXT,
+            created      TEXT NOT NULL
         )
     """)
     conn.execute("""
         CREATE TABLE IF NOT EXISTS portal_sessions (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            identity TEXT NOT NULL, method TEXT NOT NULL,
-            group_name TEXT, ip TEXT, mac TEXT,
+            id             INTEGER PRIMARY KEY AUTOINCREMENT,
+            identity       TEXT NOT NULL,
+            method         TEXT NOT NULL,
+            group_name     TEXT,
+            ip             TEXT,
+            mac            TEXT,
             bandwidth_kbps INTEGER DEFAULT 0,
-            started TEXT NOT NULL, expires TEXT NOT NULL,
-            active INTEGER NOT NULL DEFAULT 1
+            started        TEXT NOT NULL,
+            expires        TEXT NOT NULL,
+            active         INTEGER NOT NULL DEFAULT 1
         )
     """)
     conn.commit()
@@ -60,15 +68,17 @@ def init_portal():
     if row is None:
         conn.execute("INSERT INTO portal_settings (key, value) VALUES ('enabled', '0')")
     defaults = [
-        ("personel", "", 50000, 480, "Serbest erisim"),
-        ("ogrenci", "adult,social,games", 10000, 120, "Sinirli erisim"),
-        ("misafir", "adult,social,games,ads", 2000, 60, "En sinirli"),
+        ("personel", "", 50000, "Serbest erisim - sadece zararli/reklam engeli"),
+        ("ogrenci", "adult,social,games", 10000, "Sinirli - yetiskin, sosyal medya, oyun engeli"),
+        ("misafir", "adult,social,games,ads", 2000, "En sinirli - tum kategoriler engeli"),
     ]
-    for name, cats, bw, dur, desc in defaults:
-        conn.execute("INSERT OR IGNORE INTO portal_groups (name, categories, bandwidth_kbps, duration_min, description) VALUES (?, ?, ?, ?, ?)",
-                     (name, cats, bw, dur, desc))
+    for name, cats, bw, desc in defaults:
+        conn.execute("INSERT OR IGNORE INTO portal_groups (name, categories, bandwidth_kbps, description) VALUES (?, ?, ?, ?)",
+                     (name, cats, bw, desc))
     conn.commit()
     conn.close()
+
+# ---------- Ayarlar ----------
 
 def is_enabled():
     conn = get_conn()
@@ -76,12 +86,14 @@ def is_enabled():
     conn.close()
     return row and row["value"] == "1"
 
-def set_enabled(on):
+def set_enabled(on: bool):
     conn = get_conn()
-    conn.execute("INSERT INTO portal_settings (key, value) VALUES ('enabled', ?) ON CONFLICT(key) DO UPDATE SET value=?",
-                 ("1" if on else "0", "1" if on else "0"))
+    conn.execute("INSERT INTO portal_settings (key, value) VALUES ('enabled', ?) "
+                 "ON CONFLICT(key) DO UPDATE SET value=?", ("1" if on else "0", "1" if on else "0"))
     conn.commit()
     conn.close()
+
+# ---------- Gruplar ----------
 
 def list_groups():
     conn = get_conn()
@@ -95,37 +107,14 @@ def get_group(name):
     conn.close()
     return row
 
-def create_group(name, bandwidth_kbps=0, duration_min=60, categories="", description=""):
-    name = name.strip().lower().replace(" ", "_")
-    if not name:
-        return False, "Grup adi gerekli"
+def update_group(name, categories, bandwidth_kbps):
     conn = get_conn()
-    try:
-        conn.execute("INSERT INTO portal_groups (name, categories, bandwidth_kbps, duration_min, description) VALUES (?, ?, ?, ?, ?)",
-                     (name, categories, int(bandwidth_kbps), int(duration_min), description))
-        conn.commit()
-        ok, msg = True, "Grup olusturuldu"
-    except sqlite3.IntegrityError:
-        ok, msg = False, "Bu grup adi zaten var"
-    conn.close()
-    return ok, msg
-
-def update_group(name, categories, bandwidth_kbps, duration_min=None):
-    conn = get_conn()
-    if duration_min is None:
-        conn.execute("UPDATE portal_groups SET categories=?, bandwidth_kbps=? WHERE name=?",
-                     (categories, int(bandwidth_kbps), name))
-    else:
-        conn.execute("UPDATE portal_groups SET categories=?, bandwidth_kbps=?, duration_min=? WHERE name=?",
-                     (categories, int(bandwidth_kbps), int(duration_min), name))
+    conn.execute("UPDATE portal_groups SET categories=?, bandwidth_kbps=? WHERE name=?",
+                 (categories, int(bandwidth_kbps), name))
     conn.commit()
     conn.close()
 
-def delete_group(name):
-    conn = get_conn()
-    conn.execute("DELETE FROM portal_groups WHERE name=?", (name,))
-    conn.commit()
-    conn.close()
+# ---------- Kalici kullanicilar ----------
 
 def _hash(pw): return bcrypt.hashpw(pw.encode("utf-8")[:72], bcrypt.gensalt()).decode("utf-8")
 def _verify(pw, h):
@@ -144,8 +133,10 @@ def add_portal_user(username, password, full_name, group_name, duration_min, ban
         return False, "Kullanici adi ve sifre gerekli"
     conn = get_conn()
     try:
-        conn.execute("INSERT INTO portal_users (username, password_hash, full_name, group_name, duration_min, bandwidth_kbps, enabled, created) VALUES (?, ?, ?, ?, ?, ?, 1, ?)",
-                     (username, _hash(password), full_name.strip(), group_name, int(duration_min), int(bandwidth_kbps), datetime.now().strftime("%Y-%m-%d %H:%M")))
+        conn.execute(
+            "INSERT INTO portal_users (username, password_hash, full_name, group_name, duration_min, bandwidth_kbps, enabled, created) VALUES (?, ?, ?, ?, ?, ?, 1, ?)",
+            (username, _hash(password), full_name.strip(), group_name, int(duration_min), int(bandwidth_kbps), datetime.now().strftime("%Y-%m-%d %H:%M"))
+        )
         conn.commit()
         ok, msg = True, "Kullanici eklendi"
     except sqlite3.IntegrityError:
@@ -159,14 +150,18 @@ def delete_portal_user(uid):
     conn.commit()
     conn.close()
 
+# ---------- Misafir kodlari ----------
+
 def generate_code(note, group_name, duration_min, count=1):
     conn = get_conn()
     created = []
     for _ in range(count):
         code = "".join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(6))
         try:
-            conn.execute("INSERT INTO portal_codes (code, note, group_name, duration_min, used, created) VALUES (?, ?, ?, ?, 0, ?)",
-                         (code, note.strip(), group_name, int(duration_min), datetime.now().strftime("%Y-%m-%d %H:%M")))
+            conn.execute(
+                "INSERT INTO portal_codes (code, note, group_name, duration_min, used, created) VALUES (?, ?, ?, ?, 0, ?)",
+                (code, note.strip(), group_name, int(duration_min), datetime.now().strftime("%Y-%m-%d %H:%M"))
+            )
             created.append(code)
         except sqlite3.IntegrityError:
             continue
@@ -186,6 +181,8 @@ def delete_code(cid):
     conn.commit()
     conn.close()
 
+# ---------- Giris dogrulama ----------
+
 def _effective_bw(user_bw, group_name):
     if user_bw and user_bw > 0:
         return user_bw
@@ -194,37 +191,55 @@ def _effective_bw(user_bw, group_name):
 
 def portal_login(identity, secret, ip="", mac=""):
     conn = get_conn()
-    duration = method = ident = group = None
+    duration = None
+    method = None
+    ident = None
+    group = None
     bw = 0
+
     row = conn.execute("SELECT * FROM portal_codes WHERE code=?", (secret.strip().upper(),)).fetchone()
     if row and not identity.strip():
         if row["used"]:
             conn.close()
             return False, "Bu kod zaten kullanilmis"
-        duration, method, ident, group = row["duration_min"], "kod", f"kod:{row['code']}", row["group_name"]
+        duration = row["duration_min"]
+        method = "kod"
+        ident = f"kod:{row['code']}"
+        group = row["group_name"]
         conn.execute("UPDATE portal_codes SET used=1, used_by_ip=?, used_at=? WHERE id=?",
                      (ip, datetime.now().strftime("%Y-%m-%d %H:%M"), row["id"]))
     else:
         u = conn.execute("SELECT * FROM portal_users WHERE username=? AND enabled=1", (identity.strip(),)).fetchone()
         if u and _verify(secret, u["password_hash"]):
-            duration, method, ident, group, bw = u["duration_min"], "hesap", u["username"], u["group_name"], u["bandwidth_kbps"]
+            duration = u["duration_min"]
+            method = "hesap"
+            ident = u["username"]
+            group = u["group_name"]
+            bw = u["bandwidth_kbps"]
         else:
             conn.close()
             return False, "Kullanici adi/sifre veya kod hatali"
     conn.close()
+
     eff_bw = _effective_bw(bw, group)
+
     now = datetime.now()
     expires = now + timedelta(minutes=duration)
     conn = get_conn()
-    conn.execute("INSERT INTO portal_sessions (identity, method, group_name, ip, mac, bandwidth_kbps, started, expires, active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)",
-                 (ident, method, group, ip, mac, eff_bw, now.strftime("%Y-%m-%d %H:%M"), expires.strftime("%Y-%m-%d %H:%M")))
+    conn.execute(
+        "INSERT INTO portal_sessions (identity, method, group_name, ip, mac, bandwidth_kbps, started, expires, active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)",
+        (ident, method, group, ip, mac, eff_bw, now.strftime("%Y-%m-%d %H:%M"), expires.strftime("%Y-%m-%d %H:%M"))
+    )
     conn.commit()
     conn.close()
+
+    # Gercek makine: nftables MAC izni + grup filtresi + hiz limiti
     try:
         from app import gateway
         gateway.on_login(ip, mac, group, eff_bw)
     except Exception:
         pass
+
     bw_txt = f"{eff_bw//1000} Mbps" if eff_bw else "sinirsiz"
     return True, f"Giris basarili ({group} grubu, {duration} dk, {bw_txt})"
 

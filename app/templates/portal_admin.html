@@ -91,6 +91,17 @@
       </div>
 
       <div class="panel">
+        <h3>Yeni Grup Ekle</h3>
+        <form class="form-row" method="post" action="/portal/group/create">
+          <input type="text" name="name" placeholder="Grup adi (orn. hizli)" required>
+          <input class="sm" type="number" name="bandwidth_kbps" value="0" title="Hiz kbps" placeholder="Hiz kbps">
+          <input class="sm" type="number" name="duration_min" value="60" title="Sure dk" placeholder="Sure dk">
+          <button class="btn blue" type="submit">Grup Olustur</button>
+        </form>
+        <div class="muted" style="margin-top:8px;">Hiz kbps (50000=50Mbps, 0=sinirsiz). Ornek: hizli 50000, orta 10000, yavas 2000.</div>
+      </div>
+
+      <div class="panel">
         <h3>Gruplar: Filtre Profili ve Hiz Limiti</h3>
         <div class="muted" style="margin-bottom:14px;">Her grubun engelli kategorilerini ve varsayilan hiz limitini belirleyin. Hiz kbps cinsinden (10000 = 10 Mbps, 0 = sinirsiz).</div>
         {% for g in groups %}
@@ -106,6 +117,10 @@
             <label class="chk"><input type="checkbox" name="c_games" {% if "games" in cats %}checked{% endif %}> Oyun</label>
             <span class="bwbox">Hiz (kbps): <input type="number" name="bandwidth_kbps" value="{{ g.bandwidth_kbps }}"></span>
             <button class="btn blue" type="submit" style="margin-left:10px;padding:7px 16px;font-size:13px;">Kaydet</button>
+          </form>
+          <form method="post" action="/portal/group/delete" style="display:inline;margin-left:6px;">
+            <input type="hidden" name="name" value="{{ g.name }}">
+            <button class="del" type="submit" onclick="return confirm('{{ g.name }} grubu silinsin mi?')">Grubu Sil</button>
           </form>
         </div>
         {% endfor %}

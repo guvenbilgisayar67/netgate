@@ -81,8 +81,15 @@ def _parse_hosts(text):
 
 def _write_category_file(key, domains):
     path = f"{CATEGORY_DIR}/{key}.conf"
+    try:
+        from app.db import list_whitelist
+        exempt = {w["domain"] for w in list_whitelist()}
+    except Exception:
+        exempt = set()
     lines = []
     for dom in sorted(domains):
+        if dom in exempt:
+            continue  # istisna listesindekileri engelleme
         lines.append(f"address=/{dom}/0.0.0.0")
         lines.append(f"address=/{dom}/::")
     with open(path, "w") as f:
@@ -140,3 +147,25 @@ def _reload_dnsmasq():
         subprocess.run(["sudo", "systemctl", "restart", "dnsmasq"], check=False, timeout=10)
     except Exception:
         pass
+
+def reapply_all():
+    """Tum aktif kategorileri yeniden yazar (istisna degisince cagrilir)."""
+    conn = get_conn()
+    rows = conn.execute("SELECT key FROM category_state WHERE enabled=1").fetchall()
+    conn.close()
+    for r in rows:
+        key = r["key"]
+        cat = CATEGORIES.get(key)
+        if not cat:
+            continue
+        if cat["type"] == "url":
+            try:
+                req = urllib.request.Request(cat["url"], headers={"User-Agent": "NetGate"})
+                text = urllib.request.urlopen(req, timeout=30).read().decode("utf-8", "ignore")
+                domains = _parse_hosts(text)
+            except Exception:
+                continue
+        else:
+            domains = set(cat["domains"])
+        _write_category_file(key, domains)
+    _reload_dnsmasq()

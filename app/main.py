@@ -33,6 +33,7 @@ users.init_users()
 categories.init_categories()
 portal.init_portal()
 devices.init_devices()
+db.init_whitelist()
 try:
     devices.sync_exempt_to_gateway()
 except Exception:
@@ -121,11 +122,27 @@ def dashboard(request: Request):
 
 # ---------- Site Engelleme ----------
 
+
+@app.post("/whitelist/add")
+def whitelist_add(request: Request, domain: str = Form(...)):
+    if not is_logged_in(request):
+        return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
+    db.add_whitelist(domain)
+    return RedirectResponse("/blocklist?msg=wl_add", status_code=status.HTTP_303_SEE_OTHER)
+
+@app.post("/whitelist/delete")
+def whitelist_delete(request: Request, wid: int = Form(...)):
+    if not is_logged_in(request):
+        return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
+    db.delete_whitelist(wid)
+    return RedirectResponse("/blocklist?msg=wl_del", status_code=status.HTTP_303_SEE_OTHER)
+
 @app.get("/blocklist", response_class=HTMLResponse)
 def blocklist_page(request: Request):
     if not is_logged_in(request):
         return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
     return templates.TemplateResponse(request, "blocklist.html", {
+        "whitelist": db.list_whitelist(),
         "user": request.session["user"],
         "domains": db.list_domains(),
         "msg": request.query_params.get("msg"),
@@ -359,6 +376,21 @@ async def portal_group_update(request: Request):
         bw = 0
     portal.update_group(name, ",".join(cats), bw)
     return RedirectResponse("/portal?msg=group_upd", status_code=status.HTTP_303_SEE_OTHER)
+
+@app.post("/portal/group/create")
+def portal_group_create(request: Request, name: str = Form(...), bandwidth_kbps: int = Form(0), duration_min: int = Form(60)):
+    if not is_logged_in(request):
+        return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
+    portal.create_group(name, bandwidth_kbps, duration_min)
+    return RedirectResponse("/portal?msg=group_create", status_code=status.HTTP_303_SEE_OTHER)
+
+@app.post("/portal/group/delete")
+def portal_group_delete(request: Request, name: str = Form(...)):
+    if not is_logged_in(request):
+        return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
+    portal.delete_group(name)
+    return RedirectResponse("/portal?msg=group_delete", status_code=status.HTTP_303_SEE_OTHER)
+
 @app.get("/hotspot", response_class=HTMLResponse)
 def hotspot_page(request: Request):
     return templates.TemplateResponse(request, "hotspot.html", {"error": None})
