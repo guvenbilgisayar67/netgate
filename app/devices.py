@@ -58,6 +58,67 @@ def device_count():
     """Aktif cihaz sayisi."""
     return len(scan_network())
 
+def arp_scan():
+    """arp-scan ile agi AKTIF tarar - gercek anlik cihazlar. isim DHCP lease'ten."""
+    import time, subprocess
+    devices = {}
+    # DHCP lease'ten isim eslemesi (once yukle)
+    names = {}
+    now = time.time()
+    try:
+        with open("/var/lib/misc/dnsmasq.leases") as f:
+            for line in f:
+                parts = line.split()
+                if len(parts) >= 4:
+                    try:
+                        exp = int(parts[0])
+                    except ValueError:
+                        exp = 0
+                    nm = parts[3] if parts[3] != "*" else ""
+                    names[parts[1].lower()] = nm
+    except Exception:
+        pass
+    # arp-scan calistir
+    try:
+        out = subprocess.run(
+            ["sudo", "arp-scan", "--interface=enp42s0", "--localnet", "--quiet", "--ignoredups"],
+            capture_output=True, text=True, timeout=25
+        ).stdout
+    except Exception:
+        return list_devices()  # arp-scan basarisizsa eski yonteme dus
+    for line in out.splitlines():
+        parts = line.split("\t")
+        if len(parts) >= 2:
+            ip = parts[0].strip()
+            mac = parts[1].strip().lower()
+            if ip.startswith("10.10.") and len(mac) == 17:
+                devices[mac] = {"ip": ip, "mac": mac, "name": names.get(mac, "")}
+    # Muaf bilgisi ekle
+    exempt_macs = {d["mac"] for d in list_exempt()}
+    # DHCP almis MAC'ler (lease dosyasindan)
+    dhcp_macs = set(names.keys())
+    # Online (internete cikan) MAC'ler - allowed_macs setinden
+    online_macs = set()
+    try:
+        nft_out = subprocess.run(["sudo", "nft", "list", "set", "inet", "netgate", "allowed_macs"],
+                                 capture_output=True, text=True, timeout=5).stdout
+        import re as _re
+        for mm in _re.findall(r"([0-9a-f]{2}(?::[0-9a-f]{2}){5})", nft_out):
+            online_macs.add(mm.lower())
+    except Exception:
+        pass
+    result = list(devices.values())
+    for d in result:
+        d["exempt"] = d["mac"] in exempt_macs
+        if d["mac"] in online_macs or d["exempt"]:
+            d["status"] = "online"
+        elif d["mac"] in dhcp_macs:
+            d["status"] = "bagli"
+        else:
+            d["status"] = "agda"
+    result.sort(key=lambda x: tuple(int(o) for o in x["ip"].split(".")))
+    return result
+
 def list_devices():
     """Taranan cihazlar + muaf olup olmadiklari."""
     scanned = scan_network()

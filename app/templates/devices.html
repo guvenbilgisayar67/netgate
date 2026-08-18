@@ -34,7 +34,9 @@
     .msg { padding:11px 16px; border-radius:8px; font-size:14px; margin-bottom:18px; background:#e6f6ec; color:#1e7e45; }
     .empty { text-align:center; color:#8a97a8; padding:24px; font-size:14px; }
     .refresh { float:right; font-size:13px; color:#2b6cb0; text-decoration:none; }
-  </style>
+      .fbtn { padding:8px 16px; border:1px solid #d5dde6; background:#fff; border-radius:8px; font-size:13px; cursor:pointer; color:#5a6b7f; }
+    .fbtn.active { background:#2b6cb0; color:#fff; border-color:#2b6cb0; }
+</style>
 </head>
 <body>
   <div class="topbar">
@@ -61,16 +63,32 @@
       {% if msg %}<div class="msg">Islem tamamlandi.</div>{% endif %}
 
       <div class="panel">
-        <h3>Agdaki Cihazlar <a href="/devices" class="refresh">Yenile</a></h3>
+        <h3>Agdaki Cihazlar
+          <a href="/devices?scan=1" class="refresh" style="background:#2b6cb0;color:#fff;padding:5px 12px;border-radius:6px;float:right;" onclick="this.innerHTML='Taraniyor...';">Agi Tara (arp-scan)</a>
+          <a href="/devices" class="refresh" style="margin-right:10px;">Yenile</a>
+        </h3>
+        {% if scanned %}<div style="background:#e6f6ec;color:#1e7e45;padding:8px 12px;border-radius:6px;font-size:13px;margin-bottom:12px;">Aktif tarama yapildi - su an agda gercekten bagli olan cihazlar listeleniyor.</div>{% endif %}
         {% if devices %}
-        <table>
-          <thead><tr><th>IP</th><th>MAC</th><th>Isim</th><th>Durum</th><th></th></tr></thead>
+        <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+          <button type="button" class="fbtn active" data-f="all" onclick="setFilter('all')">Tumu</button>
+          <button type="button" class="fbtn" data-f="online" onclick="setFilter('online')">Online</button>
+          <button type="button" class="fbtn" data-f="bagli" onclick="setFilter('bagli')">Bagli</button>
+          <button type="button" class="fbtn" data-f="agda" onclick="setFilter('agda')">Agda</button>
+        </div>
+        <input type="text" id="search-devices" onkeyup="applyFilters()" placeholder="IP, MAC veya cihaz ismi ara..." style="width:100%;padding:11px 14px;border:1px solid #d5dde6;border-radius:8px;font-size:14px;margin-bottom:14px;">
+        <table id="table-devices">
+          <thead><tr><th>IP</th><th>MAC</th><th>Isim</th><th>Baglanti</th><th>Muaf</th><th></th></tr></thead>
           <tbody>
             {% for d in devices %}
             <tr>
               <td class="ip">{{ d.ip }}</td>
               <td class="mac">{{ d.mac }}</td>
               <td>{{ d.name or "-" }}</td>
+              <td>
+                {% if d.status == "online" %}<span style="background:#e6f6ec;color:#1e7e45;padding:3px 10px;border-radius:12px;font-size:12px;font-weight:600;">● Online</span>
+                {% elif d.status == "bagli" %}<span style="background:#fef5e7;color:#b9770e;padding:3px 10px;border-radius:12px;font-size:12px;font-weight:600;">● Bagli</span>
+                {% else %}<span style="background:#f0f0f0;color:#888;padding:3px 10px;border-radius:12px;font-size:12px;">○ Agda</span>{% endif %}
+              </td>
               <td>{% if d.exempt %}<span class="tag exempt">Muaf</span>{% else %}<span style="color:#8a97a8;">Normal</span>{% endif %}</td>
               <td style="text-align:right;">
                 {% if not d.exempt %}
@@ -95,7 +113,8 @@
         <h3>Muaf Cihazlar (captive portal'a takilmaz)</h3>
         <div class="muted" style="margin-bottom:14px;">Bu cihazlar giris yapmadan internete erisir. Fotokopi, yazici, kamera, bilgisayar sinifi gibi cihazlar icin.</div>
         {% if exempt %}
-        <table>
+        <input type="text" id="search-exempt" onkeyup="filterTable('search-exempt','table-exempt')" placeholder="IP, MAC veya cihaz ismi ara..." style="width:100%;padding:11px 14px;border:1px solid #d5dde6;border-radius:8px;font-size:14px;margin-bottom:14px;">
+        <table id="table-exempt">
           <thead><tr><th>MAC</th><th>IP</th><th>Isim</th><th>Eklendi</th><th></th></tr></thead>
           <tbody>
             {% for e in exempt %}
@@ -118,5 +137,29 @@
       </div>
     </div>
   </div>
+<script>
+var _curFilter = 'all';
+function setFilter(f){
+  _curFilter = f;
+  document.querySelectorAll('.fbtn').forEach(function(b){
+    b.classList.toggle('active', b.getAttribute('data-f') === f);
+  });
+  applyFilters();
+}
+function applyFilters(){
+  var q = document.getElementById('search-devices').value.toLowerCase();
+  document.querySelectorAll('#table-devices tbody tr').forEach(function(r){
+    var okText = r.textContent.toLowerCase().indexOf(q) > -1;
+    var okStat = _curFilter === 'all' || r.getAttribute('data-status') === _curFilter;
+    r.style.display = (okText && okStat) ? '' : 'none';
+  });
+}
+function filterTable(inputId, tableId){
+  var q = document.getElementById(inputId).value.toLowerCase();
+  document.querySelectorAll('#'+tableId+' tbody tr').forEach(function(r){
+    r.style.display = r.textContent.toLowerCase().indexOf(q) > -1 ? '' : 'none';
+  });
+}
+</script>
 </body>
 </html>

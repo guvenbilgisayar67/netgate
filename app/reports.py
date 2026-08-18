@@ -19,13 +19,45 @@ def _parse_time(ts):
     except Exception:
         return None
 
-def _read_lines(max_lines=200000):
-    try:
-        out = subprocess.run(["sudo", "tail", "-n", str(max_lines), LOG_5651],
-                             capture_output=True, text=True, timeout=15).stdout
-        return out.splitlines()
-    except Exception:
-        return []
+LOG_DIR = "/var/log/netgate5651"
+
+def _read_lines(date_from=None, date_to=None, max_lines=2000000):
+    """Tarih araligindaki gunluk dosyalari okur. Bos ise tum gunler + eski arsiv."""
+    from datetime import datetime, timedelta
+    import os, glob
+    lines = []
+    # 1) Eski tek-dosya sistemi (gecmis veri) - sadece tarih araligi genisse ya da bossa
+    #    Eski veriler tek dosyada, gunu ayirt edemedigimiz icin dahil ediyoruz
+    for p in ("/var/log/netgate-5651.log.1", "/var/log/netgate-5651.log"):
+        try:
+            with open(p, "r", errors="ignore") as f:
+                lines.extend(f.read().splitlines())
+        except Exception:
+            pass
+    # 2) Gunluk dosyalar - tarih araligina gore
+    if date_from and date_to:
+        try:
+            d = datetime.strptime(date_from, "%Y-%m-%d")
+            dt_end = datetime.strptime(date_to, "%Y-%m-%d")
+            while d <= dt_end:
+                fp = f"{LOG_DIR}/{d.strftime('%Y-%m-%d')}.log"
+                try:
+                    with open(fp, "r", errors="ignore") as f:
+                        lines.extend(f.read().splitlines())
+                except Exception:
+                    pass
+                d += timedelta(days=1)
+        except Exception:
+            pass
+    else:
+        # Tarih yoksa tum gunluk dosyalari oku
+        for fp in sorted(glob.glob(f"{LOG_DIR}/*.log")):
+            try:
+                with open(fp, "r", errors="ignore") as f:
+                    lines.extend(f.read().splitlines())
+            except Exception:
+                pass
+    return lines[-max_lines:]
 
 def _user_lookup():
     """Kullanici adi -> ad soyad eslemesi (arama icin)."""
@@ -57,7 +89,7 @@ def search_user_activity(query="", date_from=None, date_to=None, limit=500):
                                   "total": 0, "macs": set(), "fullname": ""})
     details = []
 
-    for line in _read_lines():
+    for line in _read_lines(date_from, date_to):
         parts = [p.strip() for p in line.split("|")]
         if len(parts) < 5:
             continue

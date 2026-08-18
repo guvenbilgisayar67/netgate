@@ -190,10 +190,11 @@ def api_traffic(request: Request):
 def reports_page(request: Request):
     if not is_logged_in(request):
         return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
-    from datetime import date as _date
+    from datetime import date as _date, timedelta as _td
     _today = _date.today().strftime("%Y-%m-%d")
+    _week_ago = (_date.today() - _td(days=7)).strftime("%Y-%m-%d")
     q = request.query_params.get("q", "")
-    date_from = request.query_params.get("from", "") or _today
+    date_from = request.query_params.get("from", "") or _week_ago
     date_to = request.query_params.get("to", "") or _today
     result = {"users": [], "details": []}
     if q or date_from or date_to:
@@ -228,8 +229,13 @@ def logs_page(request: Request):
 def devices_page(request: Request):
     if not is_logged_in(request):
         return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
-    cihazlar = devices.list_devices()
+    do_scan = request.query_params.get("scan") == "1"
+    if do_scan:
+        cihazlar = devices.arp_scan()
+    else:
+        cihazlar = devices.list_devices()
     return templates.TemplateResponse(request, "devices.html", {
+        "scanned": do_scan,
         "user": request.session["user"],
         "devices": cihazlar,
         "exempt": devices.list_exempt(),

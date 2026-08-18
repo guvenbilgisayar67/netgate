@@ -7,10 +7,19 @@ LOG_5651 = "/var/log/netgate-5651.log"
 def read_dns_logs(limit: int = 200, only_blocked: bool = False, search: str = ""):
     """5651 birlesik logunu okur. Format: zaman | kullanici | mac | ip | site"""
     try:
-        out = subprocess.run(
-            ["sudo", "tail", "-n", str(limit * 3), LOG_5651],
-            capture_output=True, text=True, timeout=5
-        ).stdout
+        import glob as _glob
+        _lines = []
+        # En yeni gunluk dosyalar (son 3 gun yeterli - loglar sayfasi guncel kayitlar icin)
+        _daily = sorted(_glob.glob("/var/log/netgate5651/*.log"))[-3:]
+        # Eski tek-dosya da dahil (gecmis, gunluk dosya yoksa)
+        _sources = ["/var/log/netgate-5651.log"] + _daily if not _daily else _daily
+        for _p in _sources:
+            try:
+                with open(_p, "r", errors="ignore") as _f:
+                    _lines.extend(_f.read().splitlines())
+            except Exception:
+                pass
+        out = "\n".join(_lines[-(limit * 3):])
     except Exception:
         return []
     results = []

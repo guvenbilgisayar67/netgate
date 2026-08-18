@@ -7,6 +7,12 @@ from app.db import get_conn
 
 DNS_LOG = "/var/log/netgate-dns.log"
 LOG_5651 = "/var/log/netgate-5651.log"
+LOG_DIR = "/var/log/netgate5651"
+
+def _bugunun_dosyasi():
+    """O gunun log dosya yolu: /var/log/netgate5651/YYYY-MM-DD.log"""
+    from datetime import datetime
+    return f"{LOG_DIR}/{datetime.now().strftime('%Y-%m-%d')}.log"
 
 # IP -> (kullanici, mac) onbellek (performans icin)
 _cache = {}
@@ -74,7 +80,7 @@ def main():
         user, mac = _lookup(ip)
         out = f"{ts} | {user} | {mac} | {ip} | {domain}\n"
         try:
-            with open(LOG_5651, "a") as lf:
+            with open(_bugunun_dosyasi(), "a") as lf:
                 lf.write(out)
         except Exception:
             pass
