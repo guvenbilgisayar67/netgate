@@ -169,6 +169,170 @@ sudo systemctl daemon-reload
 sudo systemctl enable netgate
 sudo systemctl start netgate
 
+
+echo "[10/19] Ek paketler (arp-scan, openpyxl)..."
+sudo apt install -y arp-scan
+"$PROJE_DIZIN/venv/bin/pip" install openpyxl
+
+echo "[11/19] arp-scan sudo izni..."
+echo "$KULLANICI ALL=(ALL) NOPASSWD: /usr/sbin/arp-scan" | sudo tee /etc/sudoers.d/netgate-arpscan
+
+echo "[12/19] WAN portu kaydet..."
+echo "${WAN_IF}" | sudo tee /etc/netgate/wan_if > /dev/null
+
+echo "[13/19] nftables DNS zorlama + DoH/QUIC engelleme..."
+sudo tee /etc/nftables.conf > /dev/null << NFTEOF
+#!/usr/sbin/nft -f
+flush ruleset
+table inet netgate {
+    set allowed_macs { type ether_addr; }
+    set blocked_ips { type ipv4_addr; flags interval; }
+    chain input {
+        type filter hook input priority 0; policy drop;
+        ct state established,related accept
+        iif "lo" accept
+        iif "${LAN_IF}" accept
+        iif "${WAN_IF}" icmp type echo-request accept
+        iif "${WAN_IF}" tcp dport 8000 accept
+        iif "${WAN_IF}" tcp dport 22 accept
+    }
+    chain forward {
+        type filter hook forward priority 0; policy drop;
+        ip saddr @blocked_ips drop
+        ct state established,related accept
+        iif "${LAN_IF}" ip daddr ${LAN_IP} accept
+        iif "${LAN_IF}" udp dport 53 accept
+        iif "${LAN_IF}" tcp dport 53 accept
+        iif "${LAN_IF}" ip daddr { 8.8.8.8, 8.8.4.4, 1.1.1.1, 1.0.0.1, 9.9.9.9, 149.112.112.112 } tcp dport 443 drop
+        iif "${LAN_IF}" udp dport 443 drop
+        iif "${LAN_IF}" ether saddr @allowed_macs oif "${WAN_IF}" accept
+    }
+    chain prerouting {
+        type nat hook prerouting priority dstnat; policy accept;
+        iif "${LAN_IF}" ether saddr != @allowed_macs tcp dport 80 dnat ip to ${LAN_IP}:8000
+        iif "${LAN_IF}" udp dport 53 ip daddr != ${LAN_IP} dnat ip to ${LAN_IP}:53
+        iif "${LAN_IF}" tcp dport 53 ip daddr != ${LAN_IP} dnat ip to ${LAN_IP}:53
+    }
+    chain postrouting {
+        type nat hook postrouting priority srcnat; policy accept;
+        oif "${WAN_IF}" masquerade
+    }
+}
+NFTEOF
+sudo systemctl restart nftables
+
+echo "[14/19] whitelist.conf + dnsmasq ayari..."
+sudo touch /etc/netgate/whitelist.conf
+sudo chown "$KULLANICI" /etc/netgate/whitelist.conf
+grep -q "whitelist.conf" /etc/dnsmasq.conf || echo "conf-file=/etc/netgate/whitelist.conf" | sudo tee -a /etc/dnsmasq.conf
+sudo systemctl restart dnsmasq
+
+echo "[15/19] DNS logrotate copytruncate..."
+sudo tee /etc/logrotate.d/netgate > /dev/null << LREOF
+/var/log/netgate-dns.log {
+    su root root
+    daily
+    rotate 730
+    compress
+    delaycompress
+    missingok
+    notifempty
+    copytruncate
+}
+LREOF
+
+echo "[16/19] 5651 gunluk log klasoru + servis..."
+sudo mkdir -p /var/log/netgate5651
+sudo chmod 755 /var/log/netgate5651
+sudo tee /etc/systemd/system/netgate-5651.service > /dev/null << SVEOF
+[Unit]
+Description=NetGate 5651 Log Servisi
+After=netgate.service dnsmasq.service
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 $PROJE_DIZIN/app/logger5651.py
+Restart=always
+RestartSec=5
+User=root
+[Install]
+WantedBy=multi-user.target
+SVEOF
+sudo systemctl daemon-reload
+sudo systemctl enable netgate-5651
+sudo systemctl start netgate-5651
+
+echo "[17/19] 5651 logrotate..."
+sudo tee /etc/logrotate.d/netgate5651-daily > /dev/null << LR2EOF
+/var/log/netgate5651/*.log {
+    su root root
+    daily
+    rotate 730
+    missingok
+    notifempty
+    nocompress
+    maxage 730
+}
+LR2EOF
+
+echo "[18/19] Oturum suresi timer..."
+sudo tee /etc/systemd/system/netgate-expire.service > /dev/null << EXEOF
+[Unit]
+Description=NetGate Oturum Suresi Kontrolu
+After=netgate.service
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 $PROJE_DIZIN/app/expire_runner.py
+User=root
+EXEOF
+sudo tee /etc/systemd/system/netgate-expire.timer > /dev/null << EXTEOF
+[Unit]
+Description=NetGate oturum suresi kontrolu (her 5 dakika)
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+[Install]
+WantedBy=timers.target
+EXTEOF
+sudo systemctl daemon-reload
+sudo systemctl enable netgate-expire.timer
+sudo systemctl start netgate-expire.timer
+
+echo "[19/19] Mail raporu (config sablonu + timer)..."
+if [ ! -f /etc/netgate/mail.conf ]; then
+sudo tee /etc/netgate/mail.conf > /dev/null << MAILEOF
+# NetGate mail ayarlari - panelden doldurun (Ayarlar > Mail Raporu)
+SMTP_SERVER=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=GONDEREN_GMAIL_ADRESI
+SMTP_PASSWORD=UYGULAMA_SIFRESI_16_HANE
+MAIL_TO=ALICI_ADRES
+PERIOD=daily
+MAILEOF
+fi
+sudo chmod 600 /etc/netgate/mail.conf
+sudo chown "$KULLANICI" /etc/netgate/mail.conf
+sudo tee /etc/systemd/system/netgate-mail.service > /dev/null << MSEOF
+[Unit]
+Description=NetGate Gunluk Log Mail Raporu
+After=network-online.target
+[Service]
+Type=oneshot
+ExecStart=$PROJE_DIZIN/venv/bin/python3 $PROJE_DIZIN/app/mail_report.py
+User=$KULLANICI
+MSEOF
+sudo tee /etc/systemd/system/netgate-mail.timer > /dev/null << MTEOF
+[Unit]
+Description=NetGate mail raporu (her aksam 23:00)
+[Timer]
+OnCalendar=*-*-* 23:00:00
+Persistent=true
+[Install]
+WantedBy=timers.target
+MTEOF
+sudo systemctl daemon-reload
+sudo systemctl enable netgate-mail.timer
+sudo systemctl start netgate-mail.timer
+
 echo ""
 echo "=== KURULUM TAMAM ==="
 echo "Panel: http://${LAN_IP}:8000  (LAN tarafindan)"
