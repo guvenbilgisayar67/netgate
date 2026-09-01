@@ -139,3 +139,134 @@ def search_user_activity(query="", date_from=None, date_to=None, limit=500):
     users.sort(key=lambda x: -x["total"])
     details.reverse()  # en yeni ustte
     return {"users": users, "details": details[:limit]}
+
+
+def dashboard_stats(gun_sayisi=1):
+    """Dashboard grafikleri icin istatistik: en cok siteler, saatlik dagilim, en aktif kullanicilar."""
+    from datetime import datetime, timedelta
+    from collections import defaultdict, Counter
+    # Bugunun (ya da son N gun) tarih araligi
+    bugun = datetime.now()
+    date_from = (bugun - timedelta(days=gun_sayisi-1)).strftime("%Y-%m-%d")
+    date_to = bugun.strftime("%Y-%m-%d")
+    lines = _read_lines(date_from, date_to)
+
+    site_counter = Counter()
+    user_counter = Counter()
+    saat_counter = defaultdict(int)
+    toplam = 0
+    tekil_kullanici = set()
+    tekil_cihaz = set()
+
+    for line in lines:
+        parts = [p.strip() for p in line.split("|")]
+        if len(parts) < 5:
+            continue
+        ts, user, mac, ip, domain = parts[0], parts[1], parts[2], parts[3], parts[4]
+        dt = _parse_time(ts)
+        # Tarih filtresi (gunluk dosyalar + eski tek-dosya karisik olabilir)
+        if dt:
+            gun_str = dt.strftime("%Y-%m-%d")
+            if gun_str < date_from or gun_str > date_to:
+                continue
+        # Domain'i sadelestir (www. at, alt alan adlarini kok domaine indirge basit)
+        d = domain.lower().replace("www.", "")
+        # Sistem/gurultu domainlerini atla (daha anlamli grafik)
+        GURULTU = ["msftconnecttest", "msftncsi", "in-addr.arpa", "windowsupdate",
+                   "gvt1.com", "ntp.org", "edge.skype", "data.microsoft",
+                   "settings-win", "dns.google", "ocsp", "crl.", "push.apple",
+                   "safebrowsing", "connectivitycheck", "clients.google"]
+        if any(x in d for x in GURULTU):
+            continue  # gurultu - grafige katma
+        site_counter[d] += 1
+        if user and user != "giris-yok":
+            user_counter[user] += 1
+            tekil_kullanici.add(user)
+        if mac and mac not in ("?", "giris-yok"):
+            tekil_cihaz.add(mac)
+        if dt:
+            saat_counter[dt.hour] += 1
+        toplam += 1
+
+    # Saatlik dagilim (0-23)
+    saatlik = [saat_counter.get(h, 0) for h in range(24)]
+
+    return {
+        "top_sites": site_counter.most_common(10),
+        "top_users": user_counter.most_common(10),
+        "saatlik": saatlik,
+        "toplam_erisim": toplam,
+        "tekil_kullanici": len(tekil_kullanici),
+        "tekil_cihaz": len(tekil_cihaz),
+    }
+
+
+def dashboard_extra():
+    """Ek grafikler: gunluk trend (7 gun), kategori dagilimi, engellenen istekler."""
+    from datetime import datetime, timedelta
+    from collections import Counter
+    import glob, os, subprocess
+
+    # 1) GUNLUK TREND - son 7 gunun erisim sayisi
+    gunluk_trend = []
+    bugun = datetime.now()
+    for i in range(6, -1, -1):
+        gun = (bugun - timedelta(days=i))
+        gun_str = gun.strftime("%Y-%m-%d")
+        fp = f"{LOG_DIR}/{gun_str}.log"
+        sayi = 0
+        try:
+            with open(fp, "r", errors="ignore") as f:
+                sayi = sum(1 for _ in f)
+        except Exception:
+            sayi = 0
+        gunluk_trend.append({"gun": gun.strftime("%d.%m"), "sayi": sayi})
+
+    # 2) KATEGORI DAGILIMI - bugunku trafigi kategorilere ayir
+    kat_domainleri = {
+        "Sosyal Medya": ["youtube", "instagram", "tiktok", "facebook", "twitter", "x.com", "snapchat", "reddit", "whatsapp", "telegram"],
+        "Oyun": ["steampowered", "epicgames", "roblox", "twitch", "ea.com", "battle.net", "minecraft", "riotgames"],
+        "Video/Muzik": ["netflix", "spotify", "disney", "twitch", "vimeo", "dailymotion"],
+        "Arama/Genel": ["google", "bing", "yahoo", "yandex", "duckduckgo"],
+    }
+    kat_sayac = Counter()
+    lines_today = _read_lines(bugun.strftime("%Y-%m-%d"), bugun.strftime("%Y-%m-%d"))
+    for line in lines_today:
+        parts = [p.strip() for p in line.split("|")]
+        if len(parts) < 5:
+            continue
+        d = parts[4].lower()
+        bulundu = False
+        for kat, domainler in kat_domainleri.items():
+            if any(dom in d for dom in domainler):
+                kat_sayac[kat] += 1
+                bulundu = True
+                break
+        if not bulundu:
+            kat_sayac["Diger"] += 1
+
+    # 3) ENGELLENEN ISTEKLER - DNS logundan (0.0.0.0 donenler)
+    engellenen_sayi = 0
+    engellenen_siteler = Counter()
+    try:
+        out = subprocess.run(["tail", "-n", "50000", "/var/log/netgate-dns.log"],
+                             capture_output=True, text=True, timeout=10).stdout
+        for line in out.splitlines():
+            if " is 0.0.0.0" in line or " is ::" in line:
+                # ornek: ... config example.com is 0.0.0.0
+                parts = line.split()
+                for i, p in enumerate(parts):
+                    if p == "is" and i > 0:
+                        dom = parts[i-1].replace("www.", "")
+                        engellenen_siteler[dom] += 1
+                        engellenen_sayi += 1
+                        break
+    except Exception:
+        pass
+
+    return {
+        "gunluk_trend": gunluk_trend,
+        "kategori": dict(kat_sayac),
+        "engellenen_sayi": engellenen_sayi,
+        "engellenen_top": engellenen_siteler.most_common(8),
+    }

@@ -2,8 +2,16 @@
 import subprocess
 import time
 
-WAN_IF = "enp5s0"
-LAN_IF = "enp42s0"
+def _read_if(fname, default):
+    try:
+        with open(f"/etc/netgate/{fname}") as f:
+            v = f.read().strip()
+            return v if v else default
+    except Exception:
+        return default
+
+WAN_IF = _read_if("wan_if", "enp5s0")
+LAN_IF = _read_if("lan_if", "enp42s0")
 
 _cached_public_ip = {"ip": "-", "ts": 0}
 

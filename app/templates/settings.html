@@ -107,6 +107,32 @@
           <button class="btn gray" type="submit">Yedekten Yukle</button>
         </form>
       </div>
+
+      <div class="panel">
+        <h3>Mail Raporu Ayarlari</h3>
+        <div class="desc">Her aksam 23:00'te o gunun internet erisim logu (5651) Excel olarak asagidaki adrese otomatik gonderilir. Gmail icin normal sifre degil, <b>uygulama sifresi</b> kullanin.</div>
+        {% if msg == "mail_saved" %}<div style="background:#e6f6ec;color:#1e7e45;padding:10px;border-radius:8px;margin-bottom:12px;">Mail ayarlari kaydedildi.</div>{% endif %}
+        {% if msg == "mail_test_ok" %}<div style="background:#e6f6ec;color:#1e7e45;padding:10px;border-radius:8px;margin-bottom:12px;">Test maili gonderildi! {{ mail_test_result }}</div>{% endif %}
+        {% if msg == "mail_test_fail" %}<div style="background:#fde8e8;color:#c0392b;padding:10px;border-radius:8px;margin-bottom:12px;">Test maili gonderilemedi: {{ mail_test_result }}</div>{% endif %}
+        <form method="post" action="/settings/mail">
+          <label style="display:block;font-size:13px;color:#5a6b7f;margin:10px 0 5px;">Gonderen Gmail Adresi</label>
+          <input type="email" name="smtp_user" value="{{ mail_conf.SMTP_USER }}" placeholder="ornek@gmail.com" style="width:100%;padding:10px;border:1px solid #d5dde6;border-radius:8px;">
+          <label style="display:block;font-size:13px;color:#5a6b7f;margin:10px 0 5px;">Uygulama Sifresi (16 hane)</label>
+          <input type="password" name="smtp_password" value="{{ mail_conf.SMTP_PASSWORD }}" placeholder="Gmail uygulama sifresi" style="width:100%;padding:10px;border:1px solid #d5dde6;border-radius:8px;">
+          <label style="display:block;font-size:13px;color:#5a6b7f;margin:10px 0 5px;">Alici Adres(ler) - virgulle ayirin</label>
+          <input type="text" name="mail_to" value="{{ mail_conf.MAIL_TO }}" placeholder="yonetici@okul.com, mudur@okul.com" style="width:100%;padding:10px;border:1px solid #d5dde6;border-radius:8px;">
+          <label style="display:block;font-size:13px;color:#5a6b7f;margin:10px 0 5px;">Rapor Sikligi</label>
+          <select name="period" style="width:100%;padding:10px;border:1px solid #d5dde6;border-radius:8px;">
+            <option value="daily" {% if mail_conf.PERIOD == "daily" %}selected{% endif %}>Gunluk (her aksam 23:00)</option>
+            <option value="weekly" {% if mail_conf.PERIOD == "weekly" %}selected{% endif %}>Haftalik (her Pazar aksami)</option>
+            <option value="monthly" {% if mail_conf.PERIOD == "monthly" %}selected{% endif %}>Aylik (ayin son gunu)</option>
+          </select>
+          <button class="btn" type="submit" style="margin-top:14px;">Kaydet</button>
+        </form>
+        <form method="post" action="/settings/mail/test" style="margin-top:10px;">
+          <button class="btn gray" type="submit">Test Maili Gonder (bugunun logu)</button>
+        </form>
+      </div>
     </div>
   </div>
 </body>

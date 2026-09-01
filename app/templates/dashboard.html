@@ -76,6 +76,85 @@
         <div class="card"><div class="k">Gateway</div><div class="v green small">Calisiyor</div><div class="badge">Panel aktif</div></div>
       </div>
 
+      <!-- YENI: Istatistik ozet kartlari -->
+      <div class="cards" style="margin-top:16px;">
+        <div class="card" style="border-left:4px solid #2b6cb0;"><div class="k">Bugun Toplam Erisim</div><div class="v">{{ "{:,}".format(dstats.toplam_erisim) }}</div><div class="badge">DNS istegi</div></div>
+        <div class="card" style="border-left:4px solid #1e7e45;"><div class="k">Aktif Kullanici</div><div class="v">{{ dstats.tekil_kullanici }}</div><div class="badge">Bugun giris yapan</div></div>
+        <div class="card" style="border-left:4px solid #e67e22;"><div class="k">Bagli Cihaz (bugun)</div><div class="v">{{ dstats.tekil_cihaz }}</div><div class="badge">Tekil MAC</div></div>
+        <div class="card" style="border-left:4px solid #8e44ad;"><div class="k">En Cok Site</div><div class="v small">{{ dstats.top_sites[0][0] if dstats.top_sites else "-" }}</div><div class="badge">{{ dstats.top_sites[0][1] if dstats.top_sites else 0 }} erisim</div></div>
+      </div>
+
+      <!-- YENI: Grafikler -->
+      <div class="row2" style="margin-top:16px;">
+        <div class="panel">
+          <h3>En Cok Ziyaret Edilen Siteler (bugun)</h3>
+          <div style="height:280px;position:relative;"><canvas id="chart-sites"></canvas></div>
+        </div>
+        <div class="panel">
+          <h3>Saatlik Trafik (bugun)</h3>
+          <div style="height:280px;position:relative;"><canvas id="chart-saatlik"></canvas></div>
+        </div>
+      </div>
+
+      <div class="row2" style="margin-top:16px;">
+        <div class="panel">
+          <h3>En Aktif Kullanicilar (bugun)</h3>
+          <div style="height:280px;position:relative;"><canvas id="chart-users"></canvas></div>
+        </div>
+        <div class="panel">
+          <h3>Ozet</h3>
+          <table style="width:100%;">
+            <tr><td style="padding:8px;color:#8a97a8;">Toplam DNS istegi</td><td style="padding:8px;font-weight:600;text-align:right;">{{ "{:,}".format(dstats.toplam_erisim) }}</td></tr>
+            <tr><td style="padding:8px;color:#8a97a8;">Aktif kullanici</td><td style="padding:8px;font-weight:600;text-align:right;">{{ dstats.tekil_kullanici }}</td></tr>
+            <tr><td style="padding:8px;color:#8a97a8;">Bagli cihaz</td><td style="padding:8px;font-weight:600;text-align:right;">{{ dstats.tekil_cihaz }}</td></tr>
+            <tr><td style="padding:8px;color:#8a97a8;">Farkli site sayisi</td><td style="padding:8px;font-weight:600;text-align:right;">{{ dstats.top_sites|length }}+</td></tr>
+          </table>
+        </div>
+      </div>
+
+      <!-- YENI: Ek grafikler -->
+      <div class="row2" style="margin-top:16px;">
+        <div class="panel">
+          <h3>Son 7 Gun Trafik Trendi</h3>
+          <div style="height:280px;position:relative;"><canvas id="chart-trend"></canvas></div>
+        </div>
+        <div class="panel">
+          <h3>Kategori Dagilimi (bugun)</h3>
+          <div style="height:280px;position:relative;"><canvas id="chart-kategori"></canvas></div>
+        </div>
+      </div>
+
+      <div class="row2" style="margin-top:16px;">
+        <div class="panel">
+          <h3>Engellenen Istekler</h3>
+          <div style="text-align:center;padding:20px 0;">
+            <div style="font-size:42px;font-weight:700;color:#c0392b;">{{ "{:,}".format(dextra.engellenen_sayi) }}</div>
+            <div style="font-size:13px;color:#8a97a8;">bugun engellenen DNS istegi</div>
+          </div>
+          {% if dextra.engellenen_top %}
+          <table style="width:100%;font-size:13px;">
+            <thead><tr><th style="text-align:left;padding:6px;color:#8a97a8;">Engellenen Site</th><th style="text-align:right;padding:6px;color:#8a97a8;">Kez</th></tr></thead>
+            <tbody>
+              {% for site, n in dextra.engellenen_top %}
+              <tr><td style="padding:6px;">{{ site }}</td><td style="padding:6px;text-align:right;font-weight:600;">{{ n }}</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          {% else %}
+          <div style="text-align:center;color:#8a97a8;font-size:13px;padding:10px;">Henuz engellenen istek yok</div>
+          {% endif %}
+        </div>
+        <div class="panel">
+          <h3>Ozet Bilgi</h3>
+          <div style="font-size:13px;color:#5a6b7f;line-height:1.8;padding:10px;">
+            Bu panelde okulun internet kullanimini ozetleyen grafikler yer alir.
+            <b>Son 7 gun trendi</b> gunluk erisim yogunlugunu, <b>kategori dagilimi</b> hangi tur sitelerin
+            ziyaret edildigini, <b>engellenen istekler</b> ise filtrenin ne kadar calistiginu gosterir.
+            Detayli kullanici raporlari icin <a href="/reports" style="color:#2b6cb0;">Kullanici Raporlari</a> sayfasina bakabilirsiniz.
+          </div>
+        </div>
+      </div>
+
       <div class="row2">
         <div class="panel">
           <h3>DNS Trafigi (son kayitlar)</h3>
@@ -116,5 +195,41 @@
       </div>
     </div>
   </div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+(function(){
+  const siteLabels = [{% for s,n in dstats.top_sites %}"{{ s }}",{% endfor %}];
+  const siteData = [{% for s,n in dstats.top_sites %}{{ n }},{% endfor %}];
+  const userLabels = [{% for u,n in dstats.top_users %}"{{ u }}",{% endfor %}];
+  const userData = [{% for u,n in dstats.top_users %}{{ n }},{% endfor %}];
+  const saatlik = [{% for v in dstats.saatlik %}{{ v }},{% endfor %}];
+
+  if(document.getElementById('chart-sites')) new Chart(document.getElementById('chart-sites'), {
+    type:'bar', data:{labels:siteLabels, datasets:[{label:'Erisim', data:siteData, backgroundColor:'#2b6cb0'}]},
+    options:{indexAxis:'y', plugins:{legend:{display:false}}, responsive:true, maintainAspectRatio:false}
+  });
+  if(document.getElementById('chart-saatlik')) new Chart(document.getElementById('chart-saatlik'), {
+    type:'line', data:{labels:[...Array(24).keys()].map(h=>h+':00'), datasets:[{label:'Istek', data:saatlik, borderColor:'#1e7e45', backgroundColor:'rgba(30,126,69,.1)', fill:true, tension:.3}]},
+    options:{plugins:{legend:{display:false}}, responsive:true, maintainAspectRatio:false}
+  });
+  if(document.getElementById('chart-users')) new Chart(document.getElementById('chart-users'), {
+    type:'bar', data:{labels:userLabels, datasets:[{label:'Erisim', data:userData, backgroundColor:'#e67e22'}]},
+    options:{indexAxis:'y', plugins:{legend:{display:false}}, responsive:true, maintainAspectRatio:false}
+  });
+
+  const trendLabels = [{% for g in dextra.gunluk_trend %}"{{ g.gun }}",{% endfor %}];
+  const trendData = [{% for g in dextra.gunluk_trend %}{{ g.sayi }},{% endfor %}];
+  const katLabels = [{% for k,v in dextra.kategori.items() %}"{{ k }}",{% endfor %}];
+  const katData = [{% for k,v in dextra.kategori.items() %}{{ v }},{% endfor %}];
+  if(document.getElementById('chart-trend')) new Chart(document.getElementById('chart-trend'), {
+    type:'line', data:{labels:trendLabels, datasets:[{label:'Erisim', data:trendData, borderColor:'#2b6cb0', backgroundColor:'rgba(43,108,176,.1)', fill:true, tension:.3}]},
+    options:{plugins:{legend:{display:false}}, responsive:true, maintainAspectRatio:false}
+  });
+  if(document.getElementById('chart-kategori')) new Chart(document.getElementById('chart-kategori'), {
+    type:'doughnut', data:{labels:katLabels, datasets:[{data:katData, backgroundColor:['#e74c3c','#9b59b6','#3498db','#1abc9c','#95a5a6','#f39c12']}]},
+    options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'right'}}}
+  });
+})();
+</script>
 </body>
 </html>

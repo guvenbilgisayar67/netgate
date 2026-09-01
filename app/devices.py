@@ -3,6 +3,15 @@ import subprocess
 import re
 from app.db import get_conn
 
+
+def _lan_if():
+    try:
+        with open("/etc/netgate/lan_if") as f:
+            v = f.read().strip()
+            return v if v else "enp42s0"
+    except Exception:
+        return "enp42s0"
+
 def init_devices():
     """Muaf cihazlar tablosunu olustur."""
     conn = get_conn()
@@ -81,7 +90,7 @@ def arp_scan():
     # arp-scan calistir
     try:
         out = subprocess.run(
-            ["sudo", "arp-scan", "--interface=enp42s0", "--localnet", "--quiet", "--ignoredups"],
+            ["sudo", "arp-scan", f"--interface={_lan_if()}", "--localnet", "--quiet", "--ignoredups"],
             capture_output=True, text=True, timeout=25
         ).stdout
     except Exception:

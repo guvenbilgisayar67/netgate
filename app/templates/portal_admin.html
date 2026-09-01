@@ -119,6 +119,8 @@
             <label class="chk"><input type="checkbox" name="c_games" {% if "games" in cats %}checked{% endif %}> Oyun</label>
             <span class="bwbox">Hiz (kbps): <input type="number" name="bandwidth_kbps" value="{{ g.bandwidth_kbps }}"></span>
             <span class="bwbox">Cihaz limiti: <input type="number" name="max_devices" value="{{ g.max_devices }}" min="1" style="width:60px;"></span>
+            <span class="bwbox">Sure (dk): <input type="number" name="duration_min" value="{{ g.duration_min }}" min="1" style="width:80px;" title="Oturum suresi. Cok uzun (orn. 525600=1 yil) = pratikte hic dusmez"></span>
+            <span class="bwbox"><label style="cursor:pointer;"><input type="checkbox" name="force_password_change" value="1" {% if g.force_password_change %}checked{% endif %}> Ilk giriste sifre degistir</label></span>
             <button class="btn blue" type="submit" style="margin-left:10px;padding:7px 16px;font-size:13px;">Kaydet</button>
           </form>
           <form method="post" action="/portal/group/delete" style="display:inline;margin-left:6px;">
@@ -130,6 +132,31 @@
       </div>
 
       <div class="panel">
+        <h3>Toplu Kullanici Ekle (CSV)</h3>
+        <div style="background:#f4f7fa;border-radius:10px;padding:16px;margin-bottom:12px;">
+          <p style="font-size:13px;color:#5a6b7f;margin-bottom:10px;">
+            CSV formati: <b>ad_soyad,kullanici_adi,sifre,grup</b> (her satir bir kullanici).
+            Kullanici adi bos birakilirsa ad-soyaddan uretilir. Grup bos ise "ogrenci" olur.
+            Ilk satir baslik olabilir (ad_soyad ile baslarsa atlanir).
+          </p>
+          <form method="post" action="/portal/bulk-upload" enctype="multipart/form-data" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+            <input type="file" name="csv_file" accept=".csv,.txt" required style="font-size:14px;">
+            <button class="btn blue" type="submit">CSV Yukle ve Ekle</button>
+          </form>
+          <a href="/portal/bulk-template" style="display:inline-block;margin-top:10px;font-size:13px;color:#2b6cb0;text-decoration:none;">📥 Ornek CSV sablonu indir</a>
+          {% if bulk_result %}
+          <div style="margin-top:12px;padding:12px;background:#fff;border-radius:8px;border:1px solid #e2e8ef;">
+            <div style="font-weight:600;color:#1e7e45;">{{ bulk_result.added }} kullanici eklendi, {{ bulk_result.skipped }} atlandi.</div>
+            <details style="margin-top:8px;">
+              <summary style="cursor:pointer;color:#2b6cb0;font-size:13px;">Detaylari goster</summary>
+              <div style="max-height:200px;overflow-y:auto;margin-top:8px;font-size:12px;font-family:monospace;color:#5a6b7f;">
+                {% for d in bulk_result.details %}<div>{{ d }}</div>{% endfor %}
+              </div>
+            </details>
+          </div>
+          {% endif %}
+        </div>
+
         <h3>Kalici Kullanici Ekle</h3>
         <form class="form-row" method="post" action="/portal/user/add" style="align-items:flex-end;">
           <div style="display:flex;flex-direction:column;"><label>Kullanici Adi</label><input type="text" name="username" placeholder="Kullanici adi" required></div>
@@ -146,16 +173,31 @@
         </form>
         <div class="muted" style="margin-top:8px;">Hiz ve Cihaz limiti alanlari 0 birakilirsa o kullanicinin grubunun varsayilani kullanilir. Deger girerseniz o kisiye ozel olur. (Hiz kbps: 50000=50Mbps, Cihaz limiti: kac cihazda ayni anda acik olabilecegi)</div>
         {% if portal_users %}
-        <table style="margin-top:16px;">
-          <thead><tr><th>Kullanici</th><th>Ad Soyad</th><th>Grup</th><th>Sure</th><th>Hiz</th><th></th></tr></thead>
+        <input type="text" id="user-search" onkeyup="filterUsers()" placeholder="Kullanici ara (isim veya kullanici adi)..." style="width:100%;padding:11px 14px;border:1px solid #d5dde6;border-radius:8px;font-size:14px;margin:16px 0 10px;">
+        <div style="font-size:13px;color:#8a97a8;margin-bottom:8px;">Toplam <b>{{ portal_users|length }}</b> kullanici</div>
+        <table id="users-table">
+          <thead><tr><th>Kullanici</th><th>Ad Soyad</th><th>Grup (degistir)</th><th>Sifre sifirla</th><th></th></tr></thead>
           <tbody>
             {% for u in portal_users %}
             <tr>
               <td class="code" style="font-size:14px;">{{ u.username }}</td>
               <td>{{ u.full_name or "-" }}</td>
-              <td><span class="tag grp">{{ u.group_name }}</span></td>
-              <td>{{ u.duration_min }} dk</td>
-              <td>{% if u.bandwidth_kbps %}<span class="tag bw">{{ (u.bandwidth_kbps/1000)|round(1) }} Mbps</span>{% else %}<span style="color:#8a97a8;">grup</span>{% endif %}</td>
+              <td>
+                <form method="post" action="/portal/user/change-group" style="display:flex;gap:5px;align-items:center;margin:0;">
+                  <input type="hidden" name="username" value="{{ u.username }}">
+                  <select name="group_name" style="padding:5px;border:1px solid #d5dde6;border-radius:6px;font-size:13px;">
+                    {% for g in groups %}<option value="{{ g.name }}" {% if g.name == u.group_name %}selected{% endif %}>{{ g.name }}</option>{% endfor %}
+                  </select>
+                  <button type="submit" class="btn blue" style="padding:5px 10px;font-size:12px;">Kaydet</button>
+                </form>
+              </td>
+              <td>
+                <form method="post" action="/portal/user/reset-password" style="display:flex;gap:5px;align-items:center;margin:0;">
+                  <input type="hidden" name="username" value="{{ u.username }}">
+                  <input type="text" name="new_password" placeholder="yeni sifre" required style="width:90px;padding:5px;border:1px solid #d5dde6;border-radius:6px;font-size:13px;">
+                  <button type="submit" style="padding:5px 10px;font-size:12px;background:#e67e22;color:#fff;border:none;border-radius:6px;cursor:pointer;">Sifirla</button>
+                </form>
+              </td>
               <td style="text-align:right;">
                 <form method="post" action="/portal/user/delete" style="display:inline;">
                   <input type="hidden" name="uid" value="{{ u.id }}">
@@ -233,5 +275,13 @@
       </div>
     </div>
   </div>
+<script>
+function filterUsers(){
+  var q = document.getElementById('user-search').value.toLowerCase();
+  document.querySelectorAll('#users-table tbody tr').forEach(function(r){
+    r.style.display = r.textContent.toLowerCase().indexOf(q) > -1 ? '' : 'none';
+  });
+}
+</script>
 </body>
 </html>

@@ -67,6 +67,15 @@ def init_portal():
     for name, cats, bw, dur, desc in defaults:
         conn.execute("INSERT OR IGNORE INTO portal_groups (name, categories, bandwidth_kbps, duration_min, description) VALUES (?, ?, ?, ?, ?)",
                      (name, cats, bw, dur, desc))
+    # --- Migration: eksik sutunlari guvenli ekle (eski/yeni DB uyumu) ---
+    for tbl, col, dflt in [("portal_users", "max_devices", "0"),
+                            ("portal_groups", "max_devices", "1"),
+                            ("portal_users", "must_change_password", "0"),
+                            ("portal_groups", "force_password_change", "0")]:
+        try:
+            conn.execute(f"ALTER TABLE {tbl} ADD COLUMN {col} INTEGER DEFAULT {dflt}")
+        except Exception:
+            pass  # sutun zaten varsa gec
     conn.commit()
     conn.close()
 
@@ -110,7 +119,7 @@ def create_group(name, bandwidth_kbps=0, duration_min=60, categories="", descrip
     conn.close()
     return ok, msg
 
-def update_group(name, categories, bandwidth_kbps, duration_min=None, max_devices=None):
+def update_group(name, categories, bandwidth_kbps, duration_min=None, max_devices=None, force_password_change=None):
     conn = get_conn()
     conn.execute("UPDATE portal_groups SET categories=?, bandwidth_kbps=? WHERE name=?",
                  (categories, int(bandwidth_kbps), name))
@@ -118,6 +127,8 @@ def update_group(name, categories, bandwidth_kbps, duration_min=None, max_device
         conn.execute("UPDATE portal_groups SET duration_min=? WHERE name=?", (int(duration_min), name))
     if max_devices is not None:
         conn.execute("UPDATE portal_groups SET max_devices=? WHERE name=?", (int(max_devices), name))
+    if force_password_change is not None:
+        conn.execute("UPDATE portal_groups SET force_password_change=? WHERE name=?", (int(force_password_change), name))
     conn.commit()
     conn.close()
 
@@ -144,7 +155,7 @@ def add_portal_user(username, password, full_name, group_name, duration_min, ban
         return False, "Kullanici adi ve sifre gerekli"
     conn = get_conn()
     try:
-        conn.execute("INSERT INTO portal_users (username, password_hash, full_name, group_name, duration_min, bandwidth_kbps, max_devices, enabled, created) VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)",
+        conn.execute("INSERT INTO portal_users (username, password_hash, full_name, group_name, duration_min, bandwidth_kbps, max_devices, must_change_password, enabled, created) VALUES (?, ?, ?, ?, ?, ?, ?, 1, 1, ?)",
                      (username, _hash(password), full_name.strip(), group_name, int(duration_min), int(bandwidth_kbps), int(max_devices), datetime.now().strftime("%Y-%m-%d %H:%M")))
         conn.commit()
         ok, msg = True, "Kullanici eklendi"
@@ -255,10 +266,20 @@ def portal_login(identity, secret, ip="", mac=""):
         if u and _verify(secret, u["password_hash"]):
             duration, method, ident, group, bw = u["duration_min"], "hesap", u["username"], u["group_name"], u["bandwidth_kbps"]
             user_max = u["max_devices"] if "max_devices" in u.keys() else 0
+            must_change = u["must_change_password"] if "must_change_password" in u.keys() else 0
+            # Grubun sifre degistirme zorunlulugu
+            grp_row = conn.execute("SELECT force_password_change FROM portal_groups WHERE name=?", (group,)).fetchone()
+            grp_force = grp_row["force_password_change"] if grp_row and "force_password_change" in grp_row.keys() else 0
         else:
             conn.close()
             return False, "Kullanici adi/sifre veya kod hatali"
     conn.close()
+    # --- Sifre degistirme zorunlulugu (grup force + kullanici must_change) ---
+    if method == "hesap":
+        _mc = must_change if 'must_change' in dir() else 0
+        _gf = grp_force if 'grp_force' in dir() else 0
+        if _mc and _gf:
+            return "CHANGE_PW", ident
     # --- Cihaz limiti kontrolu (sadece hesap girisinde) ---
     if method == "hesap":
         umax = user_max if 'user_max' in dir() else 0
@@ -307,3 +328,138 @@ def end_session(sid):
             gateway.on_logout(row["ip"], row["mac"])
         except Exception:
             pass
+
+
+def _slugify_username(full_name):
+    """Ad soyaddan kullanici adi uretir: 'Ahmet Yilmaz' -> 'ahmet.yilmaz'"""
+    import re
+    tr = str.maketrans("cgiosuCGIOSU", "cgiosucgiosu")
+    s = full_name.strip().lower()
+    s = s.replace("ç","c").replace("ğ","g").replace("ı","i").replace("ö","o").replace("ş","s").replace("ü","u")
+    s = re.sub(r"[^a-z0-9\s]", "", s)
+    parts = s.split()
+    return ".".join(parts) if parts else ""
+
+def bulk_add_users(csv_text, default_group="ogrenci"):
+    """CSV metninden toplu kullanici ekler.
+    Format: ad_soyad,kullanici_adi,sifre,grup (kullanici_adi ve grup opsiyonel)
+    Doner: {added, skipped, details:[...]}"""
+    import csv as _csv, io
+    added = skipped = 0
+    details = []
+    conn = get_conn()
+    existing = {r["username"].lower() for r in conn.execute("SELECT username FROM portal_users").fetchall()}
+    valid_groups = {g["name"] for g in conn.execute("SELECT name FROM portal_groups").fetchall()}
+    conn.close()
+
+    # Ayirici otomatik tespit (tab, noktali virgul veya virgul)
+    tab_n = csv_text.count("\t")
+    semi_n = csv_text.count(";")
+    comma_n = csv_text.count(",")
+    if tab_n >= semi_n and tab_n >= comma_n and tab_n > 0:
+        delim = "\t"
+    elif semi_n >= comma_n:
+        delim = ";"
+    else:
+        delim = ","
+    reader = _csv.reader(io.StringIO(csv_text), delimiter=delim)
+    rows = list(reader)
+    if rows and ("ad_soyad" in rows[0][0].lower().replace(" ", "") or "adsoyad" in rows[0][0].lower().replace(" ", "")):
+        rows = rows[1:]  # baslik satiri
+
+    for i, row in enumerate(rows, 1):
+        if not row or not any(c.strip() for c in row):
+            continue
+        full_name = row[0].strip() if len(row) > 0 else ""
+        username = row[1].strip() if len(row) > 1 else ""
+        password = row[2].strip() if len(row) > 2 else ""
+        group = row[3].strip() if len(row) > 3 and row[3].strip() else default_group
+
+        if not full_name and not username:
+            details.append(f"Satir {i}: bos, atlandi"); skipped += 1; continue
+        if not password:
+            details.append(f"Satir {i}: '{full_name or username}' sifre yok, atlandi"); skipped += 1; continue
+        if not username:
+            username = _slugify_username(full_name)
+        if not username:
+            details.append(f"Satir {i}: kullanici adi uretilemedi, atlandi"); skipped += 1; continue
+        if username.lower() in existing:
+            details.append(f"Satir {i}: '{username}' zaten var, atlandi"); skipped += 1; continue
+        if group not in valid_groups:
+            group = default_group
+        ok, msg = add_portal_user(username, password, full_name, group, 120, 0, 0)
+        if ok:
+            added += 1; existing.add(username.lower())
+            details.append(f"OK: '{username}' ({full_name}) -> {group}")
+        else:
+            skipped += 1; details.append(f"Satir {i}: '{username}' - {msg}")
+    return {"added": added, "skipped": skipped, "details": details}
+
+
+def change_user_group(username, new_group):
+    """Kullanicinin grubunu degistirir."""
+    conn = get_conn()
+    valid = {g["name"] for g in conn.execute("SELECT name FROM portal_groups").fetchall()}
+    if new_group not in valid:
+        conn.close()
+        return False, "Gecersiz grup"
+    conn.execute("UPDATE portal_users SET group_name=? WHERE username=?", (new_group, username))
+    conn.commit()
+    conn.close()
+    return True, "Grup guncellendi"
+
+def reset_user_password(username, new_password):
+    """Kullanicinin sifresini gecici sifreyle sifirlar. Kullanici ilk giriste degistirecek."""
+    if not new_password or len(new_password.strip()) < 1:
+        return False, "Sifre bos olamaz"
+    conn = get_conn()
+    # Sifreyi degistir + must_change=1 (grup force aciksa ilk giriste degistirtir)
+    conn.execute("UPDATE portal_users SET password_hash=?, must_change_password=1 WHERE username=?",
+                 (_hash(new_password.strip()), username))
+    conn.commit()
+    conn.close()
+    return True, "Sifre sifirlandi (kullanici ilk giriste degistirecek)"
+
+
+def change_own_password(username, new_password):
+    """Kullanici ilk giriste kendi sifresini belirler (min 6 karakter)."""
+    if not new_password or len(new_password.strip()) < 6:
+        return False, "Sifre en az 6 karakter olmali"
+    conn = get_conn()
+    u = conn.execute("SELECT id FROM portal_users WHERE username=?", (username,)).fetchone()
+    if not u:
+        conn.close()
+        return False, "Kullanici bulunamadi"
+    conn.execute("UPDATE portal_users SET password_hash=?, must_change_password=0 WHERE username=?",
+                 (_hash(new_password.strip()), username))
+    conn.commit()
+    conn.close()
+    return True, "Sifre belirlendi"
+
+
+def expire_sessions():
+    """Suresi dolan aktif oturumlari bulur, internet erisimini keser, pasif yapar.
+    Zamanlanmis gorev (timer) her birkac dakikada bir cagirir."""
+    from datetime import datetime
+    import app.gateway as gateway
+    conn = get_conn()
+    now = datetime.now().strftime("%Y-%m-%d %H:%M")
+    # Suresi gecmis aktif oturumlar
+    rows = conn.execute("SELECT id, identity, mac, ip, expires FROM portal_sessions WHERE active=1 AND expires < ?", (now,)).fetchall()
+    dusen = []
+    for r in rows:
+        # Bu MAC'in baska aktif (suresi dolmamis) oturumu var mi? Yoksa internet erisimini kes
+        mac = r["mac"]
+        if mac:
+            other = conn.execute("SELECT COUNT(*) as n FROM portal_sessions WHERE active=1 AND mac=? AND expires >= ? AND id != ?", (mac, now, r["id"])).fetchone()
+            if other["n"] == 0:
+                # Baska gecerli oturum yok - MAC'i allowed'dan cikar
+                try:
+                    gateway.remove_mac(mac)
+                except Exception:
+                    pass
+        conn.execute("UPDATE portal_sessions SET active=0 WHERE id=?", (r["id"],))
+        dusen.append(f"{r['identity']} ({mac}) - suresi doldu: {r['expires']}")
+    conn.commit()
+    conn.close()
+    return dusen

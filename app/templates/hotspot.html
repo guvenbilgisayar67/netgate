@@ -60,6 +60,22 @@
         {% endfor %}
         <a href="/hotspot" style="font-size:13px;color:#e2001a;">Geri don</a>
       </div>
+      {% elif change_pw %}
+      <div class="change-pw-box">
+        <h2 style="color:#e2001a;text-align:center;">Yeni Sifre Belirleyin</h2>
+        <p style="font-size:13px;color:#777;margin:8px 0 18px;text-align:center;">Ilk girisiniz. Guvenliginiz icin kendi sifrenizi belirleyin (en az 6 karakter).</p>
+        {% if error %}<div class="err">{{ error }}</div>{% endif %}
+        <form method="post" action="/hotspot/change-password">
+          <input type="hidden" name="identity" value="{{ identity }}">
+          <label style="display:block;font-size:13px;color:#444;margin-bottom:5px;">Mevcut Sifre</label>
+          <div class="inbox"><input type="password" name="old_secret" placeholder="mevcut sifreniz (1234)" required></div>
+          <label style="display:block;font-size:13px;color:#444;margin:12px 0 5px;">Yeni Sifre</label>
+          <div class="inbox"><input type="password" name="new_password" placeholder="en az 6 karakter" required></div>
+          <label style="display:block;font-size:13px;color:#444;margin:12px 0 5px;">Yeni Sifre (Tekrar)</label>
+          <div class="inbox"><input type="password" name="new_password2" placeholder="tekrar girin" required></div>
+          <button class="btn" type="submit" style="margin-top:16px;">Sifreyi Belirle ve Baglan</button>
+        </form>
+      </div>
       {% else %}
       <h2>İnternet Erişimi</h2>
       <div class="sub">Bağlanmak için giriş yapın</div>
