@@ -24,6 +24,10 @@ def init_devices():
             added   TEXT
         )
     """)
+    try:
+        conn.execute("ALTER TABLE exempt_devices ADD COLUMN profile TEXT DEFAULT '_muaf'")
+    except Exception:
+        pass
     conn.commit()
     conn.close()
 
@@ -144,7 +148,7 @@ def list_exempt():
     conn.close()
     return [dict(r) for r in rows]
 
-def add_exempt(mac, ip="", name=""):
+def add_exempt(mac, ip="", name="", profile="_muaf"):
     from datetime import datetime
     mac = mac.strip().lower()
     if not mac:
@@ -152,8 +156,8 @@ def add_exempt(mac, ip="", name=""):
     conn = get_conn()
     try:
         conn.execute(
-            "INSERT INTO exempt_devices (mac, ip, name, added) VALUES (?, ?, ?, ?)",
-            (mac, ip, name, datetime.now().strftime("%Y-%m-%d %H:%M"))
+            "INSERT INTO exempt_devices (mac, ip, name, added, profile) VALUES (?, ?, ?, ?, ?)",
+            (mac, ip, name, datetime.now().strftime("%Y-%m-%d %H:%M"), profile)
         )
         conn.commit()
     except Exception:
@@ -164,7 +168,7 @@ def add_exempt(mac, ip="", name=""):
     try:
         from app import gateway, filters
         gateway.allow_mac(mac)
-        port = filters.profile_port("_muaf")
+        port = filters.profile_port(profile)
         if ip and port:
             gateway.set_dns_route(ip, port)
     except Exception:
@@ -189,13 +193,31 @@ def remove_exempt(dev_id):
 
 def sync_exempt_to_gateway():
     """Tum muaf cihazlari allowed_macs'e yukler (baslangicta/reboot sonrasi)."""
-    from app import gateway
+    from app import gateway, filters
     count = 0
-    from app import filters
-    muaf_port = filters.profile_port("_muaf")
     for d in list_exempt():
         if gateway.allow_mac(d["mac"]):
             count += 1
-        if d.get("ip") and muaf_port:
-            gateway.set_dns_route(d["ip"], muaf_port)
+        prof = d["profile"] if d.get("profile") else "_muaf"
+        port = filters.profile_port(prof)
+        if d.get("ip") and port:
+            gateway.set_dns_route(d["ip"], port)
     return count
+
+
+def change_exempt_profile(dev_id, profile):
+    """Muaf cihazin filtre seviyesini (profilini) degistirir + yonlendirmeyi guncelle."""
+    conn = get_conn()
+    row = conn.execute("SELECT mac, ip FROM exempt_devices WHERE id=?", (dev_id,)).fetchone()
+    conn.execute("UPDATE exempt_devices SET profile=? WHERE id=?", (profile, dev_id))
+    conn.commit()
+    conn.close()
+    if row and row["ip"]:
+        try:
+            from app import gateway, filters
+            port = filters.profile_port(profile)
+            if port:
+                gateway.set_dns_route(row["ip"], port)
+        except Exception:
+            pass
+    return True

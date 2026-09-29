@@ -96,6 +96,9 @@
                   <input type="hidden" name="mac" value="{{ d.mac }}">
                   <input type="hidden" name="ip" value="{{ d.ip }}">
                   <input type="hidden" name="name" value="{{ d.name }}">
+                  <select name="profile" style="padding:6px;border:1px solid #d5dde6;border-radius:6px;font-size:12px;margin-right:4px;">
+                    {% for val,lbl in levels %}<option value="{{ val }}">{{ lbl }}</option>{% endfor %}
+                  </select>
                   <button class="btn green" type="submit">Muaf Yap</button>
                 </form>
                 {% else %}
@@ -115,13 +118,21 @@
         {% if exempt %}
         <input type="text" id="search-exempt" onkeyup="filterTable('search-exempt','table-exempt')" placeholder="IP, MAC veya cihaz ismi ara..." style="width:100%;padding:11px 14px;border:1px solid #d5dde6;border-radius:8px;font-size:14px;margin-bottom:14px;">
         <table id="table-exempt">
-          <thead><tr><th>MAC</th><th>IP</th><th>Isim</th><th>Eklendi</th><th></th></tr></thead>
+          <thead><tr><th>MAC</th><th>IP</th><th>Isim</th><th>Seviye</th><th>Eklendi</th><th></th></tr></thead>
           <tbody>
             {% for e in exempt %}
             <tr>
               <td class="mac">{{ e.mac }}</td>
               <td class="ip">{{ e.ip or "-" }}</td>
               <td>{{ e.name or "-" }}</td>
+              <td>
+                <form method="post" action="/devices/exempt/profile" style="display:inline;">
+                  <input type="hidden" name="dev_id" value="{{ e.id }}">
+                  <select name="profile" onchange="this.form.submit()" style="padding:5px;border:1px solid #d5dde6;border-radius:6px;font-size:12px;">
+                    {% for val,lbl in levels %}<option value="{{ val }}" {% if (e.profile or '_muaf')==val %}selected{% endif %}>{{ lbl }}</option>{% endfor %}
+                  </select>
+                </form>
+              </td>
               <td style="color:#8a97a8;font-size:13px;">{{ e.added }}</td>
               <td style="text-align:right;">
                 <form method="post" action="/devices/exempt/remove" style="display:inline;">

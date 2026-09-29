@@ -21,7 +21,8 @@ LAN_IP = "10.10.0.1"
 
 MUAF_NAME = "_muaf"
 MUAF_CATS = ["adult"]      # muaf cihazlarin engelli kategorileri (yasal minimum)
-BASE_PORT = 5300           # profil portlari: BASE+1, BASE+2...; _muaf = BASE+99
+ACIK_NAME = "_acik"        # tam acik profil (hicbir sey engellenmez)
+BASE_PORT = 5300           # profil portlari: BASE+1...; _acik=BASE+98, _muaf=BASE+99
 
 # ---------- Kategori cache ----------
 
@@ -64,7 +65,7 @@ def _profiles():
     conn = get_conn()
     groups = conn.execute("SELECT name, categories FROM portal_groups ORDER BY name").fetchall()
     conn.close()
-    profs = [(MUAF_NAME, list(MUAF_CATS), BASE_PORT + 99)]
+    profs = [(ACIK_NAME, [], BASE_PORT + 98), (MUAF_NAME, list(MUAF_CATS), BASE_PORT + 99)]
     for i, g in enumerate(groups):
         cats = [c.strip() for c in (g["categories"] or "").split(",") if c.strip()]
         profs.append((g["name"], cats, BASE_PORT + 1 + i))
