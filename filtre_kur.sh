@@ -64,7 +64,7 @@ echo "[4/6] kategori cache (buyuk listeler inecek, biraz surebilir)..."
 cd "$PROJE" && "$PY" -c "from app import filters; print('  ', filters.build_catcache())"
 
 echo "[5/6] profil config'leri + servisleri baslat..."
-cd "$PROJE" && "$PY" -c "from app import filters; [print('   profil:', g['name'], 'port', g['port']) for g in filters.generate_all()]"
+cd "$PROJE" && "$PY" -c "from app import filters; filters.write_group_blocklists(); [print('   profil:', g['name'], 'port', g['port']) for g in filters.generate_all()]"
 PROFILLER="$(cd "$PROJE" && "$PY" -c "from app import filters; print(' '.join(p['name'] for p in filters.list_profiles()))")"
 for prof in $PROFILLER; do sudo systemctl enable --now "netgate-dns@$prof" >/dev/null 2>&1 || true; done
 

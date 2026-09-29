@@ -41,6 +41,7 @@ except Exception:
 # Filtre profillerini uret + servisleri baslat + aktif oturum yonlendirmelerini geri yukle
 try:
     from app import filters as _filters
+    _filters.write_group_blocklists()
     _filters.generate_all()
     _filters.apply_all()
 except Exception:
