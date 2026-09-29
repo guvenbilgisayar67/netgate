@@ -26,8 +26,13 @@ CATEGORIES = {
         "desc": "YouTube, Instagram, TikTok, Facebook, Twitter/X, Snapchat",
         "type": "list",
         "domains": [
-            "youtube.com", "instagram.com", "tiktok.com", "facebook.com",
-            "twitter.com", "x.com", "snapchat.com", "reddit.com",
+            "youtube.com", "youtu.be", "googlevideo.com", "ytimg.com",
+            "youtube-nocookie.com", "ggpht.com", "youtubei.googleapis.com",
+            "instagram.com", "cdninstagram.com",
+            "tiktok.com", "tiktokcdn.com", "tiktokv.com",
+            "facebook.com", "fbcdn.net", "messenger.com",
+            "twitter.com", "x.com", "twimg.com",
+            "snapchat.com", "reddit.com", "redditstatic.com", "redd.it",
         ],
     },
     "games": {
