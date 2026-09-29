@@ -280,21 +280,21 @@ def devices_exempt_add(request: Request, mac: str = Form(...), ip: str = Form(""
     if not is_logged_in(request):
         return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
     devices.add_exempt(mac, ip, name, profile)
-    return RedirectResponse("/devices?msg=exempt_add", status_code=status.HTTP_303_SEE_OTHER)
+    return RedirectResponse("/devices?msg=exempt_add#muaf", status_code=status.HTTP_303_SEE_OTHER)
 
 @app.post("/devices/exempt/remove")
 def devices_exempt_remove(request: Request, dev_id: int = Form(...)):
     if not is_logged_in(request):
         return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
     devices.remove_exempt(dev_id)
-    return RedirectResponse("/devices?msg=exempt_del", status_code=status.HTTP_303_SEE_OTHER)
+    return RedirectResponse("/devices?msg=exempt_del#muaf", status_code=status.HTTP_303_SEE_OTHER)
 
 @app.post("/devices/exempt/profile")
 def devices_exempt_profile(request: Request, dev_id: int = Form(...), profile: str = Form(...)):
     if not is_logged_in(request):
         return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
     devices.change_exempt_profile(dev_id, profile)
-    return RedirectResponse("/devices?msg=exempt_profile", status_code=status.HTTP_303_SEE_OTHER)
+    return RedirectResponse("/devices?msg=exempt_profile#muaf", status_code=status.HTTP_303_SEE_OTHER)
 
 # ---------- Kullanicilar ----------
 
