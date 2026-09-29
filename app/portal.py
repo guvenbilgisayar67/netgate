@@ -264,12 +264,14 @@ def portal_login(identity, secret, ip="", mac=""):
     else:
         u = conn.execute("SELECT * FROM portal_users WHERE username=? AND enabled=1", (identity.strip(),)).fetchone()
         if u and _verify(secret, u["password_hash"]):
-            duration, method, ident, group, bw = u["duration_min"], "hesap", u["username"], u["group_name"], u["bandwidth_kbps"]
+            method, ident, group, bw = "hesap", u["username"], u["group_name"], u["bandwidth_kbps"]
             user_max = u["max_devices"] if "max_devices" in u.keys() else 0
             must_change = u["must_change_password"] if "must_change_password" in u.keys() else 0
-            # Grubun sifre degistirme zorunlulugu
-            grp_row = conn.execute("SELECT force_password_change FROM portal_groups WHERE name=?", (group,)).fetchone()
+            # Grup ayarlari: sifre zorunlulugu + SURE (tek sorgu)
+            grp_row = conn.execute("SELECT force_password_change, duration_min FROM portal_groups WHERE name=?", (group,)).fetchone()
             grp_force = grp_row["force_password_change"] if grp_row and "force_password_change" in grp_row.keys() else 0
+            # Sure: grubun suresini kullan (panelden degistirilince herkese uygulanir). Grup yoksa kullanicininki.
+            duration = grp_row["duration_min"] if (grp_row and "duration_min" in grp_row.keys() and grp_row["duration_min"]) else u["duration_min"]
         else:
             conn.close()
             return False, "Kullanici adi/sifre veya kod hatali"
@@ -387,7 +389,7 @@ def bulk_add_users(csv_text, default_group="ogrenci"):
             details.append(f"Satir {i}: '{username}' zaten var, atlandi"); skipped += 1; continue
         if group not in valid_groups:
             group = default_group
-        ok, msg = add_portal_user(username, password, full_name, group, 120, 0, 0)
+        ok, msg = add_portal_user(username, password, full_name, group, 0, 0, 0)  # sure=0 -> giriste grup suresi kullanilir
         if ok:
             added += 1; existing.add(username.lower())
             details.append(f"OK: '{username}' ({full_name}) -> {group}")
