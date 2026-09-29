@@ -170,15 +170,21 @@ def blocklist_page(request: Request):
         "whitelist": db.list_whitelist(),
         "user": request.session["user"],
         "domains": db.list_domains(),
+        "groups": portal.list_groups(),
         "msg": request.query_params.get("msg"),
     })
 
 @app.post("/blocklist/add")
-def blocklist_add(request: Request, domain: str = Form(...), note: str = Form("")):
+async def blocklist_add(request: Request):
     if not is_logged_in(request):
         return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
+    form = await request.form()
+    domain = form.get("domain", "")
+    note = form.get("note", "")
+    sel = form.getlist("g")
+    groups = "all" if (not sel or "all" in sel) else ",".join(sel)
     if domain.strip():
-        ok = db.add_domain(domain, note)
+        ok = db.add_domain(domain, note, groups)
         msg = "eklendi" if ok else "zaten_var"
     else:
         msg = "bos"

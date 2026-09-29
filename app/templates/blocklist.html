@@ -64,10 +64,20 @@
       {% if msg == "bos" %}<div class="msg warn">Alan adi bos olamaz.</div>{% endif %}
 
       <div class="panel">
-        <form class="addform" method="post" action="/blocklist/add">
-          <input type="text" name="domain" placeholder="ornek: youtube.com" autofocus required>
-          <input type="text" name="note" placeholder="Not (istege bagli)">
-          <button type="submit">Engelle</button>
+        <form method="post" action="/blocklist/add">
+          <div class="addform">
+            <input type="text" name="domain" placeholder="ornek: youtube.com" autofocus required>
+            <input type="text" name="note" placeholder="Not (istege bagli)">
+            <button type="submit">Engelle</button>
+          </div>
+          <div style="margin-top:12px;font-size:13px;color:#5a6b7f;">
+            Hangi gruplara uygulansin? <span style="color:#8a97a8;">(hicbiri secilmezse TUM gruplara)</span>
+            <div style="margin-top:8px;display:flex;gap:16px;flex-wrap:wrap;">
+              {% for g in groups %}
+              <label style="display:flex;align-items:center;gap:5px;"><input type="checkbox" name="g" value="{{ g.name }}"> {{ g.name }}</label>
+              {% endfor %}
+            </div>
+          </div>
         </form>
       </div>
 
@@ -75,13 +85,14 @@
         {% if domains %}
         <table>
           <thead>
-            <tr><th>Alan Adi</th><th>Not</th><th>Eklenme</th><th></th></tr>
+            <tr><th>Alan Adi</th><th>Not</th><th>Gruplar</th><th>Eklenme</th><th></th></tr>
           </thead>
           <tbody>
             {% for d in domains %}
             <tr>
               <td class="dom">{{ d.domain }}</td>
               <td>{{ d.note or "-" }}</td>
+              <td>{% if d.groups and d.groups != "all" %}<span style="color:#b26a00;font-size:13px;">{{ d.groups }}</span>{% else %}<span style="color:#8a97a8;font-size:13px;">Tum gruplar</span>{% endif %}</td>
               <td>{{ d.created }}</td>
               <td style="text-align:right;">
                 <form method="post" action="/blocklist/delete" style="display:inline;">

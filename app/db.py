@@ -22,6 +22,10 @@ def init_db():
             created  TEXT NOT NULL
         )
     """)
+    try:
+        conn.execute("ALTER TABLE blocked_domains ADD COLUMN groups TEXT DEFAULT 'all'")
+    except Exception:
+        pass
     conn.commit()
     conn.close()
 
@@ -48,15 +52,15 @@ def clean_domain(domain: str) -> str:
     d = d.split(":")[0]
     return d.strip()
 
-def add_domain(domain: str, note: str = ""):
+def add_domain(domain: str, note: str = "", groups: str = "all"):
     domain = clean_domain(domain)
     if not domain:
         return False
     conn = get_conn()
     try:
         conn.execute(
-            "INSERT INTO blocked_domains (domain, note, created) VALUES (?, ?, ?)",
-            (domain, note.strip(), datetime.now().strftime("%Y-%m-%d %H:%M"))
+            "INSERT INTO blocked_domains (domain, note, created, groups) VALUES (?, ?, ?, ?)",
+            (domain, note.strip(), datetime.now().strftime("%Y-%m-%d %H:%M"), groups or "all")
         )
         conn.commit()
         ok = True
@@ -65,6 +69,11 @@ def add_domain(domain: str, note: str = ""):
     conn.close()
     if ok:
         apply_blocklist()
+        try:
+            from app import filters
+            filters.rebuild_manual_blocks()
+        except Exception:
+            pass
     return ok
 
 def delete_domain(domain_id: int):
@@ -73,6 +82,11 @@ def delete_domain(domain_id: int):
     conn.commit()
     conn.close()
     apply_blocklist()
+    try:
+        from app import filters
+        filters.rebuild_manual_blocks()
+    except Exception:
+        pass
 
 def apply_blocklist():
     """Veritabanindaki siteleri dnsmasq formatinda dosyaya yazar ve dnsmasq'i yeniler."""
