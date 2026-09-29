@@ -44,6 +44,25 @@ def remove_mac(mac):
     ok, _ = _run(["sudo", "nft", "delete", "element", "inet", "netgate", "allowed_macs", "{", mac, "}"])
     return ok
 
+# ---------- DNS profil yonlendirmesi (grup bazli filtre) ----------
+
+def set_dns_route(ip, port):
+    """Bir IP'nin DNS'ini belirtilen profil portuna yonlendirir (nft dns_route map)."""
+    if not ip or not port:
+        return False
+    # Once eskiyi sil (idempotent), sonra ekle
+    _run(["sudo", "nft", "delete", "element", "inet", "netgate", "dns_route", "{", ip, "}"])
+    ok, _ = _run(["sudo", "nft", "add", "element", "inet", "netgate", "dns_route",
+                  "{", ip, ":", "10.10.0.1", ".", str(port), "}"])
+    return ok
+
+def clear_dns_route(ip):
+    """Bir IP'nin DNS yonlendirmesini kaldirir (varsayilan :53'e doner)."""
+    if not ip:
+        return False
+    ok, _ = _run(["sudo", "nft", "delete", "element", "inet", "netgate", "dns_route", "{", ip, "}"])
+    return ok
+
 # ---------- Hiz limiti (tc) ----------
 
 def apply_bandwidth(ip, kbps):
@@ -92,6 +111,14 @@ def on_login(ip, mac, group_name, bandwidth_kbps):
     results["mac_found"] = mac
     results["mac"] = allow_mac(mac) if mac else False
     results["bandwidth"] = apply_bandwidth(ip, bandwidth_kbps)
+    # Grup bazli DNS filtre yonlendirmesi
+    try:
+        from app import filters
+        port = filters.profile_port(group_name)
+        if port and ip:
+            results["dns_route"] = set_dns_route(ip, port)
+    except Exception:
+        pass
     return results
 
 def on_logout(ip, mac):
@@ -100,3 +127,5 @@ def on_logout(ip, mac):
     if mac:
         remove_mac(mac)
     remove_bandwidth(ip)
+    if ip:
+        clear_dns_route(ip)

@@ -160,17 +160,20 @@ def add_exempt(mac, ip="", name=""):
         conn.close()
         return False
     conn.close()
-    # Gateway'e hemen ekle (allowed_macs)
+    # Gateway'e hemen ekle (allowed_macs + muaf DNS profili)
     try:
-        from app import gateway
+        from app import gateway, filters
         gateway.allow_mac(mac)
+        port = filters.profile_port("_muaf")
+        if ip and port:
+            gateway.set_dns_route(ip, port)
     except Exception:
         pass
     return True
 
 def remove_exempt(dev_id):
     conn = get_conn()
-    row = conn.execute("SELECT mac FROM exempt_devices WHERE id=?", (dev_id,)).fetchone()
+    row = conn.execute("SELECT mac, ip FROM exempt_devices WHERE id=?", (dev_id,)).fetchone()
     conn.execute("DELETE FROM exempt_devices WHERE id=?", (dev_id,))
     conn.commit()
     conn.close()
@@ -179,6 +182,8 @@ def remove_exempt(dev_id):
         try:
             from app import gateway
             gateway.remove_mac(row["mac"])
+            if row["ip"]:
+                gateway.clear_dns_route(row["ip"])
         except Exception:
             pass
 
@@ -186,7 +191,11 @@ def sync_exempt_to_gateway():
     """Tum muaf cihazlari allowed_macs'e yukler (baslangicta/reboot sonrasi)."""
     from app import gateway
     count = 0
+    from app import filters
+    muaf_port = filters.profile_port("_muaf")
     for d in list_exempt():
         if gateway.allow_mac(d["mac"]):
             count += 1
+        if d.get("ip") and muaf_port:
+            gateway.set_dns_route(d["ip"], muaf_port)
     return count

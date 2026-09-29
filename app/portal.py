@@ -458,6 +458,7 @@ def expire_sessions():
                 # Baska gecerli oturum yok - MAC'i allowed'dan cikar
                 try:
                     gateway.remove_mac(mac)
+                    gateway.clear_dns_route(r["ip"])
                 except Exception:
                     pass
         conn.execute("UPDATE portal_sessions SET active=0 WHERE id=?", (r["id"],))

@@ -38,6 +38,21 @@ try:
     devices.sync_exempt_to_gateway()
 except Exception:
     pass
+# Filtre profillerini uret + servisleri baslat + aktif oturum yonlendirmelerini geri yukle
+try:
+    from app import filters as _filters
+    _filters.generate_all()
+    _filters.apply_all()
+except Exception:
+    pass
+try:
+    from app import gateway as _gw, filters as _f
+    for _s in portal.list_sessions(active_only=True):
+        _port = _f.profile_port(_s["group_name"])
+        if _port and _s["ip"]:
+            _gw.set_dns_route(_s["ip"], _port)
+except Exception:
+    pass
 
 def is_logged_in(request: Request) -> bool:
     return request.session.get("user") is not None
@@ -528,6 +543,13 @@ async def portal_group_update(request: Request):
         dur = 60
     fpc = 1 if form.get("force_password_change") else 0
     portal.update_group(name, ",".join(cats), bw, duration_min=dur, max_devices=md, force_password_change=fpc)
+    # Kategoriler degisti -> bu grubun DNS filtre profilini yeniden uret + baslat
+    try:
+        from app import filters as _filters
+        _filters.generate_all()
+        _filters.restart_profile(name)
+    except Exception:
+        pass
     return RedirectResponse("/portal?msg=group_upd", status_code=status.HTTP_303_SEE_OTHER)
 
 @app.post("/portal/group/create")
