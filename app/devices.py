@@ -262,16 +262,25 @@ def sync_exempt_to_gateway():
     """Tum muaf cihazlari allowed_macs'e yukler (baslangicta/reboot sonrasi)."""
     from app import gateway, filters
     count = 0
+    # Portlari BIR KEZ hesapla (cihaz basina DB acmaktan kacin -> acilista kilit olmaz)
+    try:
+        ports = {p["name"]: p["port"] for p in filters.list_profiles()}
+    except Exception:
+        ports = {}
     for d in list_exempt():
-        if gateway.allow_mac(d["mac"]):
-            count += 1
-        prof = d["profile"] if d.get("profile") else "_muaf"
-        port = filters.profile_port(prof)
-        if port:
-            gateway.set_dns_route_mac(d["mac"], port)
-        # Eski IP-bazli kalinti temizligi
-        if d.get("ip"):
-            gateway.clear_dns_route(d["ip"])
+        # Her cihaz ayri try/except: tek bir hata tum senkronu durdurmasin
+        try:
+            if gateway.allow_mac(d["mac"]):
+                count += 1
+            prof = d["profile"] if d.get("profile") else "_muaf"
+            port = ports.get(prof)
+            if port:
+                gateway.set_dns_route_mac(d["mac"], port)
+            # Eski IP-bazli kalinti temizligi
+            if d.get("ip"):
+                gateway.clear_dns_route(d["ip"])
+        except Exception:
+            continue
     return count
 
 
