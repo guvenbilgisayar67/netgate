@@ -129,8 +129,8 @@
             {% for e in exempt %}
             <tr>
               <td class="mac">{{ e.mac }}</td>
-              <td class="ip">{{ e.ip or "-" }}</td>
-              <td>{{ e.name or "-" }}</td>
+              <td class="ip">{{ e.cur_ip or "-" }}</td>
+              <td>{{ e.disp_name or "-" }}</td>
               <td>
                 <form method="post" action="/devices/exempt/profile" style="display:inline;">
                   <input type="hidden" name="dev_id" value="{{ e.id }}">

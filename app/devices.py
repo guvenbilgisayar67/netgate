@@ -38,7 +38,21 @@ def init_devices():
     conn.commit()
     conn.close()
 
+def _lease_map():
+    """DHCP lease dosyasindan guncel {mac: ip} eslemesi."""
+    m = {}
+    try:
+        with open("/var/lib/misc/dnsmasq.leases") as f:
+            for line in f:
+                parts = line.split()
+                if len(parts) >= 3 and parts[2].startswith("10.10."):
+                    m[parts[1].lower()] = parts[2]
+    except Exception:
+        pass
+    return m
+
 def get_device_names():
+    """Elle verilen cihaz isimleri: {mac: isim}."""
     conn = get_conn()
     try:
         rows = conn.execute("SELECT mac, name FROM device_names").fetchall()
@@ -48,17 +62,21 @@ def get_device_names():
     return {r["mac"]: r["name"] for r in rows if r["name"]}
 
 def set_device_name(mac, name):
+    """Bir cihaza elle isim verir (bossa ismi siler)."""
     from datetime import datetime
-    mac = (mac or "").strip().lower(); name = (name or "").strip()
+    mac = (mac or "").strip().lower()
+    name = (name or "").strip()
     if not mac:
         return False
     conn = get_conn()
     if name:
-        conn.execute("INSERT INTO device_names (mac, name, updated) VALUES (?, ?, ?) ON CONFLICT(mac) DO UPDATE SET name=?, updated=?",
+        conn.execute("INSERT INTO device_names (mac, name, updated) VALUES (?, ?, ?) "
+                     "ON CONFLICT(mac) DO UPDATE SET name=?, updated=?",
                      (mac, name, datetime.now().strftime("%Y-%m-%d %H:%M"), name, datetime.now().strftime("%Y-%m-%d %H:%M")))
     else:
         conn.execute("DELETE FROM device_names WHERE mac=?", (mac,))
-    conn.commit(); conn.close()
+    conn.commit()
+    conn.close()
     return True
 
 def _run(cmd):
@@ -183,7 +201,15 @@ def list_exempt():
     conn = get_conn()
     rows = conn.execute("SELECT * FROM exempt_devices ORDER BY id").fetchall()
     conn.close()
-    return [dict(r) for r in rows]
+    out = [dict(r) for r in rows]
+    # Gosterim icin: guncel IP (DHCP lease) + elle verilen isim overlay
+    leases = _lease_map()
+    manual = get_device_names()
+    for d in out:
+        mac = (d.get("mac") or "").lower()
+        d["cur_ip"] = leases.get(mac) or d.get("ip") or ""
+        d["disp_name"] = manual.get(mac) or d.get("name") or ""
+    return out
 
 def add_exempt(mac, ip="", name="", profile="_muaf"):
     from datetime import datetime
@@ -201,13 +227,16 @@ def add_exempt(mac, ip="", name="", profile="_muaf"):
         conn.close()
         return False
     conn.close()
-    # Gateway'e hemen ekle (allowed_macs + muaf DNS profili)
+    # Gateway'e hemen ekle (allowed_macs + muaf DNS profili - MAC bazli yonlendirme)
     try:
         from app import gateway, filters
         gateway.allow_mac(mac)
         port = filters.profile_port(profile)
-        if ip and port:
-            gateway.set_dns_route(ip, port)
+        if port:
+            gateway.set_dns_route_mac(mac, port)
+        # Eski IP-bazli kalinti varsa temizle (artik MAC ile yonlendiriyoruz)
+        if ip:
+            gateway.clear_dns_route(ip)
     except Exception:
         pass
     return True
@@ -223,6 +252,7 @@ def remove_exempt(dev_id):
         try:
             from app import gateway
             gateway.remove_mac(row["mac"])
+            gateway.clear_dns_route_mac(row["mac"])
             if row["ip"]:
                 gateway.clear_dns_route(row["ip"])
         except Exception:
@@ -237,8 +267,11 @@ def sync_exempt_to_gateway():
             count += 1
         prof = d["profile"] if d.get("profile") else "_muaf"
         port = filters.profile_port(prof)
-        if d.get("ip") and port:
-            gateway.set_dns_route(d["ip"], port)
+        if port:
+            gateway.set_dns_route_mac(d["mac"], port)
+        # Eski IP-bazli kalinti temizligi
+        if d.get("ip"):
+            gateway.clear_dns_route(d["ip"])
     return count
 
 
@@ -249,12 +282,12 @@ def change_exempt_profile(dev_id, profile):
     conn.execute("UPDATE exempt_devices SET profile=? WHERE id=?", (profile, dev_id))
     conn.commit()
     conn.close()
-    if row and row["ip"]:
+    if row and row["mac"]:
         try:
             from app import gateway, filters
             port = filters.profile_port(profile)
             if port:
-                gateway.set_dns_route(row["ip"], port)
+                gateway.set_dns_route_mac(row["mac"], port)
         except Exception:
             pass
     return True

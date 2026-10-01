@@ -63,6 +63,27 @@ def clear_dns_route(ip):
     ok, _ = _run(["sudo", "nft", "delete", "element", "inet", "netgate", "dns_route", "{", ip, "}"])
     return ok
 
+# ---------- MAC bazli DNS yonlendirmesi (muaf cihazlar: IP degisse de calisir) ----------
+
+def set_dns_route_mac(mac, port):
+    """Bir MAC'in DNS'ini profil portuna yonlendirir (dns_route_mac map).
+    MAC degismedigi icin cihaz DHCP'den yeni IP alsa bile filtre dogru uygulanir."""
+    if not mac or not port:
+        return False
+    mac = mac.lower()
+    _run(["sudo", "nft", "delete", "element", "inet", "netgate", "dns_route_mac", "{", mac, "}"])
+    ok, _ = _run(["sudo", "nft", "add", "element", "inet", "netgate", "dns_route_mac",
+                  "{", mac, ":", "10.10.0.1", ".", str(port), "}"])
+    return ok
+
+def clear_dns_route_mac(mac):
+    """Bir MAC'in DNS yonlendirmesini kaldirir."""
+    if not mac:
+        return False
+    ok, _ = _run(["sudo", "nft", "delete", "element", "inet", "netgate", "dns_route_mac",
+                  "{", mac.lower(), "}"])
+    return ok
+
 # ---------- Hiz limiti (tc) ----------
 
 def apply_bandwidth(ip, kbps):
