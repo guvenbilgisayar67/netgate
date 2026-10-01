@@ -275,6 +275,13 @@ def devices_page(request: Request):
         "msg": request.query_params.get("msg"),
     })
 
+@app.post("/devices/name")
+def devices_set_name(request: Request, mac: str = Form(...), name: str = Form("")):
+    if not is_logged_in(request):
+        return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
+    devices.set_device_name(mac, name)
+    return RedirectResponse("/devices?msg=name_saved", status_code=status.HTTP_303_SEE_OTHER)
+
 @app.post("/devices/exempt/add")
 def devices_exempt_add(request: Request, mac: str = Form(...), ip: str = Form(""), name: str = Form(""), profile: str = Form("_muaf")):
     if not is_logged_in(request):

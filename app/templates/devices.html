@@ -83,7 +83,13 @@
             <tr>
               <td class="ip">{{ d.ip }}</td>
               <td class="mac">{{ d.mac }}</td>
-              <td>{{ d.name or "-" }}</td>
+              <td>
+                <form method="post" action="/devices/name" style="display:flex;gap:4px;align-items:center;">
+                  <input type="hidden" name="mac" value="{{ d.mac }}">
+                  <input type="text" name="name" value="{{ d.name }}" placeholder="isim ver" style="width:120px;padding:5px;border:1px solid #d5dde6;border-radius:5px;font-size:12px;">
+                  <button class="btn blue" type="submit" style="padding:5px 9px;font-size:12px;">Kaydet</button>
+                </form>
+              </td>
               <td>
                 {% if d.status == "online" %}<span style="background:#e6f6ec;color:#1e7e45;padding:3px 10px;border-radius:12px;font-size:12px;font-weight:600;">● Online</span>
                 {% elif d.status == "bagli" %}<span style="background:#fef5e7;color:#b9770e;padding:3px 10px;border-radius:12px;font-size:12px;font-weight:600;">● Bagli</span>

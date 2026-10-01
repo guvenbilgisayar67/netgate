@@ -28,8 +28,38 @@ def init_devices():
         conn.execute("ALTER TABLE exempt_devices ADD COLUMN profile TEXT DEFAULT '_muaf'")
     except Exception:
         pass
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS device_names (
+            mac     TEXT PRIMARY KEY,
+            name    TEXT,
+            updated TEXT
+        )
+    """)
     conn.commit()
     conn.close()
+
+def get_device_names():
+    conn = get_conn()
+    try:
+        rows = conn.execute("SELECT mac, name FROM device_names").fetchall()
+    except Exception:
+        rows = []
+    conn.close()
+    return {r["mac"]: r["name"] for r in rows if r["name"]}
+
+def set_device_name(mac, name):
+    from datetime import datetime
+    mac = (mac or "").strip().lower(); name = (name or "").strip()
+    if not mac:
+        return False
+    conn = get_conn()
+    if name:
+        conn.execute("INSERT INTO device_names (mac, name, updated) VALUES (?, ?, ?) ON CONFLICT(mac) DO UPDATE SET name=?, updated=?",
+                     (mac, name, datetime.now().strftime("%Y-%m-%d %H:%M"), name, datetime.now().strftime("%Y-%m-%d %H:%M")))
+    else:
+        conn.execute("DELETE FROM device_names WHERE mac=?", (mac,))
+    conn.commit(); conn.close()
+    return True
 
 def _run(cmd):
     try:
@@ -129,6 +159,10 @@ def arp_scan():
             d["status"] = "bagli"
         else:
             d["status"] = "agda"
+    manual = get_device_names()
+    for d in result:
+        if manual.get(d["mac"]):
+            d["name"] = manual[d["mac"]]
     result.sort(key=lambda x: tuple(int(o) for o in x["ip"].split(".")))
     return result
 
@@ -136,8 +170,11 @@ def list_devices():
     """Taranan cihazlar + muaf olup olmadiklari."""
     scanned = scan_network()
     exempt_macs = {d["mac"] for d in list_exempt()}
+    manual = get_device_names()
     for d in scanned:
         d["exempt"] = d["mac"] in exempt_macs
+        if manual.get(d["mac"]):
+            d["name"] = manual[d["mac"]]
     return scanned
 
 # ---------- Muaf cihazlar ----------
