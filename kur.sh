@@ -333,8 +333,17 @@ sudo systemctl daemon-reload
 sudo systemctl enable netgate-mail.timer
 sudo systemctl start netgate-mail.timer
 
+echo "[SON-1] Veritabani ilk kurulum (admin + varsayilan gruplar, portal kullanicilari BOS)..."
+# Servis zaten DB'yi olusturur ama garanti icin acikca init et (gruplar filtre_kur.sh'ten once hazir olsun)
+"$PROJE_DIZIN/venv/bin/python3" -c "from app import db,users,categories,portal,devices; db.init_db(); users.init_users(); categories.init_categories(); portal.init_portal(); devices.init_devices(); db.init_whitelist(); print('  DB hazir')" || true
+
+echo "[SON-2] Grup bazli DNS filtre altyapisi (filtre_kur.sh)..."
+# dns_route + dns_route_mac haritalari, per-grup dnsmasq profilleri, DoT/DoH engelleme, kategori cache
+PROJE_DIZIN="$PROJE_DIZIN" KULLANICI="$KULLANICI" bash "$PROJE_DIZIN/filtre_kur.sh"
+
 echo ""
 echo "=== KURULUM TAMAM ==="
 echo "Panel: http://${LAN_IP}:8000  (LAN tarafindan)"
 echo "Veya WAN IP'sinden: http://<wan-ip>:8000"
-echo "Ilk giris: admin / admin"
+echo "Ilk giris: admin / admin  (ilk giriste sifre degistirmeniz istenir)"
+echo "Captive portal kullanicilari BOS baslar - panelden ekleyebilirsiniz (Captive Portal menusu)."
